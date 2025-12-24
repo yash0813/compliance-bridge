@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useUser } from '../App'
+import { authAPI } from '../services/api'
 import {
     LayoutDashboard,
     LineChart,
@@ -83,7 +84,8 @@ export default function Sidebar() {
                 ? regulatorNavItems
                 : traderNavItems
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        await authAPI.logout()
         setUser(null)
     }
 

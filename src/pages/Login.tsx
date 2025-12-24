@@ -6,6 +6,7 @@ import {
     CheckCircle, Zap, Shield, Activity, Lock as LockIcon,
     Sparkles, FileSearch
 } from 'lucide-react'
+import { authAPI, checkAPIHealth } from '../services/api'
 import './Login.css'
 
 export default function Login() {
@@ -17,8 +18,9 @@ export default function Login() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [activeFeature, setActiveFeature] = useState(0)
+    const [apiAvailable, setApiAvailable] = useState<boolean | null>(null)
 
-    // Demo credentials
+    // Demo credentials (fallback when backend is not running)
     const demoUsers = {
         'trader@demo.com': { id: '1', name: 'Demo Trader', email: 'trader@demo.com', role: 'trader' as const },
         'broker@demo.com': { id: '2', name: 'Broker Admin', email: 'broker@demo.com', role: 'broker' as const },
@@ -56,15 +58,38 @@ export default function Login() {
         return () => clearInterval(interval)
     }, [])
 
+    // Check if backend API is available on mount
+    useEffect(() => {
+        const checkAPI = async () => {
+            const isAvailable = await checkAPIHealth()
+            setApiAvailable(isAvailable)
+            console.log(`🔌 Backend API: ${isAvailable ? 'Connected' : 'Not available (using demo mode)'}`)
+        }
+        checkAPI()
+    }, [])
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
         setError('')
 
-        await new Promise(resolve => setTimeout(resolve, 1200))
+        try {
+            // Try real API first if available
+            if (apiAvailable) {
+                const response = await authAPI.login(email, password)
+                setUser(response.user)
+                navigate('/')
+                return
+            }
+        } catch (apiError: unknown) {
+            console.log('API login failed, trying demo mode...', apiError)
+        }
 
+        // Fallback to demo mode
+        await new Promise(resolve => setTimeout(resolve, 500))
         const user = demoUsers[email as keyof typeof demoUsers]
         if (user && password === 'demo123') {
+            localStorage.setItem('user', JSON.stringify(user))
             setUser(user)
             navigate('/')
         } else {
