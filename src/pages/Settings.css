@@ -1,0 +1,193 @@
+.settings-page {
+    animation: fadeIn 0.4s ease;
+}
+
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-6);
+}
+
+.settings-section {
+    display: flex;
+    flex-direction: column;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+}
+
+.section-header svg {
+    color: var(--primary-500);
+}
+
+.section-header h2 {
+    font-size: var(--text-lg);
+    font-weight: 600;
+}
+
+.settings-card {
+    background: var(--surface-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+}
+
+.setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.setting-item:last-child {
+    border-bottom: none;
+}
+
+.setting-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.setting-label {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.setting-value {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+.setting-value.mono {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+}
+
+.setting-value.capitalize {
+    text-transform: capitalize;
+}
+
+.setting-description {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+/* Theme Toggle */
+.theme-toggle {
+    display: flex;
+    background: var(--surface-secondary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-1);
+    cursor: pointer;
+}
+
+.toggle-option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+}
+
+.toggle-option.active {
+    background: var(--gradient-primary);
+    color: white;
+}
+
+/* Toggle Switch */
+.toggle {
+    width: 48px;
+    height: 24px;
+    background: var(--neutral-300);
+    border-radius: var(--radius-full);
+    position: relative;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.toggle.active {
+    background: var(--success-500);
+}
+
+.toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    box-shadow: var(--shadow-sm);
+    transition: transform var(--transition-fast);
+}
+
+.toggle.active::after {
+    transform: translateX(24px);
+}
+
+/* Broker Items */
+.broker-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.broker-item:last-child {
+    border-bottom: none;
+}
+
+.broker-icon {
+    width: 44px;
+    height: 44px;
+    background: var(--surface-secondary);
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.broker-item.connected .broker-icon {
+    background: var(--gradient-primary);
+    color: white;
+}
+
+.broker-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.broker-name {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.broker-status {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+.broker-item.connected .broker-status {
+    color: var(--success-600);
+}
+
+@media (max-width: 1024px) {
+    .settings-grid {
+        grid-template-columns: 1fr;
+    }
+}
