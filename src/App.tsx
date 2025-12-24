@@ -1,3 +1,14 @@
+/**
+ * Compliance-Bridge Main Application
+ * 
+ * @author Yash
+ * @version 1.0.0
+ * @description SEBI-compliant algo trading platform with multi-role dashboards
+ * 
+ * Using HashRouter for Electron desktop app compatibility
+ * (file:// protocol doesn't work with BrowserRouter)
+ */
+
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useState, createContext, useContext } from 'react'
 import Layout from './components/Layout'
