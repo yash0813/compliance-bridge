@@ -215,7 +215,7 @@ Contributions are welcome! Please read our contributing guidelines before submit
 
 ## 📞 Contact
 
-For enterprise inquiries and demos, contact us at: **support@compliance-bridge.com**
+For enterprise inquiries and demos, contact us at: **yash.c0813@gmail.com**
 
 ---
 
