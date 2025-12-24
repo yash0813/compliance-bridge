@@ -22,6 +22,7 @@ import Compliance from './pages/Compliance'
 import AuditLogs from './pages/AuditLogs'
 import Settings from './pages/Settings'
 import Login from './pages/Login'
+import Help from './pages/Help'
 // New Enterprise Pages
 import AuditTimeline from './pages/AuditTimeline'
 import BrokerHealth from './pages/BrokerHealth'
@@ -130,6 +131,7 @@ function App() {
                             <Route path="strategy-compliance" element={<StrategyCompliance />} />
                             <Route path="how-it-works" element={<HowItWorks />} />
                             <Route path="security" element={<SecurityCompliance />} />
+                            <Route path="help" element={<Help />} />
                         </Route>
                     </Routes>
                 </HashRouter>

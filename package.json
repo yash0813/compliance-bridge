@@ -2,6 +2,7 @@
   "name": "compliance-bridge",
   "private": true,
   "version": "1.0.0",
+  "homepage": "https://yash0813.github.io/compliance-bridge",
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
@@ -10,7 +11,9 @@
     "preview": "vite preview",
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && NODE_ENV=development electron .\"",
     "electron:build": "npm run build && electron-builder --win",
-    "electron:build:all": "npm run build && electron-builder --win --mac --linux"
+    "electron:build:all": "npm run build && electron-builder --win --mac --linux",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
   },
   "build": {
     "appId": "com.compliancebridge.app",
@@ -55,6 +58,7 @@
     "concurrently": "^9.2.1",
     "electron": "^39.2.7",
     "electron-builder": "^26.0.12",
+    "gh-pages": "^6.3.0",
     "typescript": "^5.7.3",
     "vercel": "^50.1.3",
     "vite": "^5.4.21",

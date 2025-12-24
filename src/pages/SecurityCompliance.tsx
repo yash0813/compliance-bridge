@@ -112,6 +112,7 @@ export default function SecurityCompliance() {
     const [ipList, setIpList] = useState(ipWhitelistData)
     const [showAddIP, setShowAddIP] = useState(false)
     const [newIP, setNewIP] = useState({ ip: '', label: '', location: '' })
+    const [ipError, setIpError] = useState('')
     const [currentIP, setCurrentIP] = useState('')
     const [lastCheck, setLastCheck] = useState(new Date())
 
@@ -149,21 +150,38 @@ export default function SecurityCompliance() {
     }
 
     const handleAddIP = () => {
-        if (newIP.ip && newIP.label) {
-            const newEntry: IPWhitelist = {
-                id: String(ipList.length + 1),
-                ip: newIP.ip,
-                label: newIP.label,
-                status: 'pending',
-                addedOn: new Date().toISOString().split('T')[0],
-                expiresOn: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                verifiedBy: 'Pending SEBI Verification',
-                location: newIP.location || 'India'
-            }
-            setIpList([...ipList, newEntry])
-            setNewIP({ ip: '', label: '', location: '' })
-            setShowAddIP(false)
+        setIpError('')
+
+        // Simple IP validation regex
+        const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/
+
+        if (!newIP.ip || !newIP.label) {
+            setIpError('Please fill in both IP address and label')
+            return
         }
+
+        if (!ipRegex.test(newIP.ip)) {
+            setIpError('Please enter a valid IPv4 address (e.g., 192.168.1.1)')
+            return
+        }
+
+        const newEntry: IPWhitelist = {
+            id: String(Date.now()), // Better ID than length
+            ip: newIP.ip,
+            label: newIP.label,
+            status: 'pending',
+            addedOn: new Date().toISOString().split('T')[0],
+            expiresOn: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            verifiedBy: 'Pending SEBI Verification',
+            location: newIP.location || 'India'
+        }
+        setIpList([...ipList, newEntry])
+        setNewIP({ ip: '', label: '', location: '' })
+        setShowAddIP(false)
+    }
+
+    const handleDeleteIP = (id: string) => {
+        setIpList(ipList.filter(ip => ip.id !== id))
     }
 
     const isCurrentIPWhitelisted = ipList.some(ip => ip.ip === currentIP && ip.status === 'active')
@@ -345,6 +363,11 @@ export default function SecurityCompliance() {
                                         Submit for SEBI Verification
                                     </button>
                                 </div>
+                                {ipError && (
+                                    <p className="form-error" style={{ color: 'var(--error-500)', fontSize: '13px', marginBottom: 'var(--space-2)' }}>
+                                        <AlertTriangle size={14} /> {ipError}
+                                    </p>
+                                )}
                                 <p className="form-note">
                                     <AlertTriangle size={14} />
                                     New IPs require SEBI verification (typically 3-5 business days). Cost: ₹5,000-15,000/month per IP.
@@ -392,7 +415,11 @@ export default function SecurityCompliance() {
                                             </td>
                                             <td>{ip.expiresOn}</td>
                                             <td>
-                                                <button className="btn btn-ghost btn-sm">
+                                                <button
+                                                    className="btn btn-ghost btn-sm text-error"
+                                                    style={{ color: 'var(--error-500)' }}
+                                                    onClick={() => handleDeleteIP(ip.id)}
+                                                >
                                                     <Trash2 size={14} />
                                                 </button>
                                             </td>
