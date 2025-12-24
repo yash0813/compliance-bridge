@@ -7,7 +7,6 @@ import {
     FileText,
     Briefcase,
     ShieldCheck,
-
     Settings,
     LogOut,
     Zap,
@@ -23,6 +22,9 @@ import {
     Eye
 } from 'lucide-react'
 import './Sidebar.css'
+
+// Navigation items are defined per role - each role sees different menu options
+// This keeps the UI clean and role-specific
 
 const traderNavItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
