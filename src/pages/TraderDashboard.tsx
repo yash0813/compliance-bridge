@@ -9,7 +9,14 @@ import {
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
 import './TraderDashboard.css'
 
-// Mock data
+// =============================================
+// MOCK DATA - Replace with actual API calls later
+// TODO: Connect to WebSocket for real-time updates
+// Author: Yash
+// Last Updated: 24 Dec 2024
+// =============================================
+
+// P&L data for intraday chart - shows performance throughout the day
 const pnlData = [
     { time: '09:15', value: 0, benchmark: 0 },
     { time: '10:00', value: 2500, benchmark: 1800 },
