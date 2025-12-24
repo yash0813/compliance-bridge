@@ -29,6 +29,11 @@ import BrokerHealth from './pages/BrokerHealth'
 import StrategyCompliance from './pages/StrategyCompliance'
 import HowItWorks from './pages/HowItWorks'
 import SecurityCompliance from './pages/SecurityCompliance'
+// JM Financial Architecture Pages
+import SignalGateway from './pages/SignalGateway'
+import OrderQueue from './pages/OrderQueue'
+import RiskEngine from './pages/RiskEngine'
+import BrokerAdapters from './pages/BrokerAdapters'
 
 // Theme Context
 interface ThemeContextType {
@@ -132,6 +137,11 @@ function App() {
                             <Route path="how-it-works" element={<HowItWorks />} />
                             <Route path="security" element={<SecurityCompliance />} />
                             <Route path="help" element={<Help />} />
+                            {/* JM Financial Architecture Routes */}
+                            <Route path="signal-gateway" element={<SignalGateway />} />
+                            <Route path="order-queue" element={<OrderQueue />} />
+                            <Route path="risk-engine" element={<RiskEngine />} />
+                            <Route path="broker-adapters" element={<BrokerAdapters />} />
                         </Route>
                     </Routes>
                 </HashRouter>

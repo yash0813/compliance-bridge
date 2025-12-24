@@ -19,7 +19,11 @@ import {
     Server,
     Award,
     Info,
-    Eye
+    Eye,
+    Radio,
+    Layers,
+    Shield,
+    Plug
 } from 'lucide-react'
 import './Sidebar.css'
 
@@ -36,20 +40,24 @@ const traderNavItems = [
 
 const brokerNavItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { path: '/signal-gateway', icon: Radio, label: 'Signal Gateway' },
+    { path: '/order-queue', icon: Layers, label: 'Order Queue' },
+    { path: '/risk-engine', icon: Shield, label: 'Risk Engine' },
+    { path: '/broker-adapters', icon: Plug, label: 'Broker Adapters' },
     { path: '/broker-health', icon: Server, label: 'Control Center' },
     { path: '/security', icon: ShieldCheck, label: 'Security & IP' },
-    { path: '/strategy-compliance', icon: Award, label: 'Certification' },
     { path: '/audit-timeline', icon: Activity, label: 'Audit Timeline' },
-    { path: '/orders', icon: FileText, label: 'Order Flow' },
 ]
 
 const adminNavItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { path: '/signal-gateway', icon: Radio, label: 'Signal Gateway' },
+    { path: '/order-queue', icon: Layers, label: 'Order Queue' },
+    { path: '/risk-engine', icon: Shield, label: 'Risk Engine' },
+    { path: '/broker-adapters', icon: Plug, label: 'Broker Adapters' },
     { path: '/broker-health', icon: Server, label: 'Control Center' },
     { path: '/security', icon: ShieldCheck, label: 'Security & IP' },
-    { path: '/strategy-compliance', icon: Award, label: 'Certification' },
     { path: '/audit-timeline', icon: Activity, label: 'Audit Timeline' },
-    { path: '/orders', icon: FileText, label: 'Orders' },
     { path: '/settings', icon: Settings, label: 'Settings' },
 ]
 
