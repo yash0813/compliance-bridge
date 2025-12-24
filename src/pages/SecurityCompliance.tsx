@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import {
-    Shield, Server, Globe, CheckCircle, XCircle, AlertTriangle,
-    Lock, Key, Eye, EyeOff, Plus, Trash2, RefreshCw, Copy,
-    Building2, FileText, Clock, Calendar, ChevronRight,
-    Fingerprint, Wifi, MapPin, Activity, AlertOctagon
+    Shield, Server, CheckCircle, XCircle, AlertTriangle,
+    Eye, EyeOff, Plus, Trash2, RefreshCw, Copy,
+    Building2, FileText, Clock, Calendar,
+    Fingerprint, MapPin, Activity, AlertOctagon
 } from 'lucide-react'
 import './SecurityCompliance.css'
 
