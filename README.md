@@ -4,6 +4,8 @@
 
 A comprehensive infrastructure that connects algo traders with brokers while ensuring regulatory compliance, IP protection, and complete audit trails.
 
+### 🌐 [Live Demo →](https://yash0813.github.io/compliance-bridge)
+
 ![React](https://img.shields.io/badge/React-18.3-61DAFB?logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript)
 ![Vite](https://img.shields.io/badge/Vite-5.4-646CFF?logo=vite)
@@ -51,6 +53,15 @@ A comprehensive infrastructure that connects algo traders with brokers while ens
 - Trade counts per version
 - Deployment timestamps
 - Change logs
+
+### 🏗️ Core Architecture (JM Financial Stack)
+
+| Component | Description |
+|-----------|-------------|
+| **📡 Signal Ingestion Gateway** | Real-time monitoring of incoming trading signals with throughput charts |
+| **📦 Order Queue (Kafka)** | Message queue visualization with partitions and depth monitoring |
+| **🛡️ Risk Engine** | Margin, exposure, drawdown, and VaR metrics with alerts |
+| **🔌 Broker Adapters** | Zerodha, Angel One, Upstox, ICICI Direct connection management |
 
 ---
 
