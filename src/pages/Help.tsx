@@ -63,8 +63,8 @@ export default function Help() {
                     Our dedicated support team is available 24/7 for Enterprise clients.
                 </p>
                 <div style={{ display: 'flex', gap: 'var(--space-4)', justifyContent: 'center' }}>
-                    <button className="btn btn-primary">Contact Support</button>
-                    <button className="btn btn-secondary">Email us: support@compliance-bridge.com</button>
+                    <a href="mailto:yash.c0813@gmail.com" className="btn btn-primary" style={{ textDecoration: 'none' }}>Contact Support</a>
+                    <button className="btn btn-secondary">Email us: yash.c0813@gmail.com</button>
                 </div>
             </div>
         </div>
