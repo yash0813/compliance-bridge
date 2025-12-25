@@ -39,6 +39,9 @@ export default function Header() {
     const [showSearch, setShowSearch] = useState(false)
     const [notifications, setNotifications] = useState(mockNotifications)
     const [searchQuery, setSearchQuery] = useState('')
+    const [searchResult, setSearchResult] = useState<any>(null)
+    const [searchError, setSearchError] = useState<string | null>(null)
+    const [isSearching, setIsSearching] = useState(false)
     const notifRef = useRef<HTMLDivElement>(null)
     const searchRef = useRef<HTMLDivElement>(null)
 
@@ -132,20 +135,27 @@ export default function Header() {
         }
     }
 
+    const handleSearch = async (query: string) => {
+        setIsSearching(true);
+        setSearchError(null);
+        setSearchResult(null);
+
+        try {
+            const quote = await marketAPI.getQuote(query.toUpperCase());
+            setSearchResult(quote);
+        } catch (e: any) {
+            console.error("Search error:", e);
+            setSearchError(e.message || "Symbol not found");
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
     const currentTime = new Date().toLocaleTimeString('en-IN', {
         hour: '2-digit',
         minute: '2-digit',
         hour12: true
     })
-
-    const handleSearch = async (query: string) => {
-        try {
-            const quote = await marketAPI.getQuote(query.toUpperCase())
-            alert(`${quote.symbol}: ₹${quote.lastPrice} (${quote.changePercent}%)`)
-        } catch (e) {
-            alert("Symbol not found or limit reached")
-        }
-    }
 
     return (
         <header className="header">
@@ -173,6 +183,8 @@ export default function Header() {
                         onClick={() => {
                             setShowSearch(true);
                             setSearchQuery(''); // Reset query on open
+                            setSearchResult(null);
+                            setSearchError(null);
                         }}
                     >
                         <Search size={18} />
@@ -199,7 +211,7 @@ export default function Header() {
                                 <input
                                     type="text"
                                     className="search-input"
-                                    placeholder="Search for symbols, strategies, settings..."
+                                    placeholder="Search for symbols (e.g., RELIANCE, TCS)..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     onKeyDown={(e) => {
@@ -214,49 +226,63 @@ export default function Header() {
                                 </button>
                             </div>
                             <div className="search-modal-body">
-                                <div className="search-section">
-                                    <h4>Quick Actions</h4>
-                                    <div className="search-actions">
-                                        <button className="search-action-item">
-                                            <Zap size={16} />
-                                            <span>New Strategy</span>
-                                        </button>
-                                        <button className="search-action-item">
-                                            <Activity size={16} />
-                                            <span>View Positions</span>
-                                        </button>
-                                        <button className="search-action-item">
-                                            <Shield size={16} />
-                                            <span>Compliance Check</span>
-                                        </button>
-                                        <button className="search-action-item">
-                                            <Settings size={16} />
-                                            <span>Settings</span>
-                                        </button>
+                                {isSearching && (
+                                    <div className="p-4 text-center text-muted">
+                                        <p>Searching...</p>
                                     </div>
-                                </div>
-                                <div className="search-section">
-                                    <h4>{searchQuery ? 'Search Results' : 'Recent Searches'}</h4>
-                                    <div className="recent-searches">
-                                        {searchQuery ? (
-                                            <button
-                                                className="recent-search-item"
-                                                onClick={() => handleSearch(searchQuery)}
-                                            >
-                                                <span style={{ fontWeight: 'bold' }}>{searchQuery.toUpperCase()}</span>
-                                                <span style={{ fontSize: '0.8em', marginLeft: '8px', color: 'var(--text-secondary)' }}>
-                                                    Click to fetch Real-Time Quote
-                                                </span>
-                                            </button>
-                                        ) : (
-                                            <>
-                                                <button className="recent-search-item">RELIANCE</button>
-                                                <button className="recent-search-item">TCS</button>
-                                                <button className="recent-search-item">Momentum Alpha</button>
-                                            </>
-                                        )}
+                                )}
+
+                                {searchError && (
+                                    <div className="p-4 text-center text-danger" style={{ color: '#ff6b6b' }}>
+                                        <p>❌ {searchError}</p>
                                     </div>
-                                </div>
+                                )}
+
+                                {searchResult && (
+                                    <div className="search-result-card" style={{ padding: '20px', background: 'var(--bg-secondary)', borderRadius: '12px', marginTop: '10px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                                            <h3 style={{ margin: 0, fontSize: '1.2rem' }}>{searchResult.symbol}</h3>
+                                            <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>{new Date(searchResult.timestamp).toLocaleTimeString()}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+                                            <span style={{ fontSize: '2rem', fontWeight: 'bold' }}>₹{searchResult.lastPrice.toLocaleString('en-IN')}</span>
+                                            <span style={{
+                                                fontSize: '1rem',
+                                                color: searchResult.change >= 0 ? '#4caf50' : '#ff6b6b',
+                                                display: 'flex',
+                                                alignItems: 'center'
+                                            }}>
+                                                {searchResult.change >= 0 ? '+' : ''}{searchResult.change} ({searchResult.changePercent}%)
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {!isSearching && !searchResult && !searchError && (
+                                    <>
+                                        <div className="search-section">
+                                            <h4>Quick Actions</h4>
+                                            <div className="search-actions">
+                                                <button className="search-action-item">
+                                                    <Zap size={16} />
+                                                    <span>New Strategy</span>
+                                                </button>
+                                                <button className="search-action-item">
+                                                    <Activity size={16} />
+                                                    <span>View Positions</span>
+                                                </button>
+                                                <button className="search-action-item">
+                                                    <Shield size={16} />
+                                                    <span>Compliance Check</span>
+                                                </button>
+                                                <button className="search-action-item">
+                                                    <Settings size={16} />
+                                                    <span>Settings</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>

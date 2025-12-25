@@ -38,6 +38,11 @@ app.use((req, res, next) => {
     next();
 });
 
+// Root Redirect for Health Check
+app.get('/', (req, res) => {
+    res.redirect('/api/health');
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
