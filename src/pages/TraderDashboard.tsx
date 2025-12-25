@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { ordersAPI, positionsAPI, strategiesAPI } from '../services/api'
 import {
     TrendingUp, TrendingDown, DollarSign, Target,
     PieChart, ArrowUpRight, ArrowDownRight,
@@ -16,7 +17,7 @@ import './TraderDashboard.css'
 // Last Updated: 24 Dec 2024
 // =============================================
 
-// P&L data for intraday chart - shows performance throughout the day
+// Keep P&L data mocked for now until backend supports timeseries aggregation
 const pnlData = [
     { time: '09:15', value: 0, benchmark: 0 },
     { time: '10:00', value: 2500, benchmark: 1800 },
@@ -40,47 +41,95 @@ const weeklyPnL = [
     { day: 'Fri', profit: 12450, loss: -800 },
 ]
 
-const positions = [
-    { symbol: 'RELIANCE', exchange: 'NSE', qty: 100, avgPrice: 2450, ltp: 2475, pnl: 2500, pnlPct: 1.02, product: 'CNC', change: 0.85 },
-    { symbol: 'TCS', exchange: 'NSE', qty: 50, avgPrice: 3890, ltp: 3850, pnl: -2000, pnlPct: -1.03, product: 'MIS', change: -0.42 },
-    { symbol: 'INFY', exchange: 'NSE', qty: 75, avgPrice: 1450, ltp: 1478, pnl: 2100, pnlPct: 1.93, product: 'CNC', change: 1.23 },
-    { symbol: 'HDFCBANK', exchange: 'NSE', qty: 40, avgPrice: 1620, ltp: 1645, pnl: 1000, pnlPct: 1.54, product: 'MIS', change: 0.65 },
-]
-
-const recentOrders = [
-    { id: 1, time: '10:32:15', symbol: 'RELIANCE', side: 'BUY', qty: 100, price: 2450, status: 'filled', type: 'LIMIT' },
-    { id: 2, time: '10:31:45', symbol: 'TCS', side: 'SELL', qty: 50, price: 3850, status: 'filled', type: 'MARKET' },
-    { id: 3, time: '10:30:22', symbol: 'INFY', side: 'BUY', qty: 75, price: 1450, status: 'pending', type: 'LIMIT' },
-    { id: 4, time: '10:28:10', symbol: 'HDFCBANK', side: 'BUY', qty: 40, price: 1620, status: 'filled', type: 'LIMIT' },
-    { id: 5, time: '10:25:33', symbol: 'SBIN', side: 'SELL', qty: 100, price: 625, status: 'rejected', type: 'LIMIT' },
-]
-
-const strategies = [
-    { id: 1, name: 'Momentum Alpha', status: 'active', pnl: 8500, winRate: 72, trades: 45, roi: 15.2, color: '#10B981' },
-    { id: 2, name: 'Mean Reversion', status: 'active', pnl: 3200, winRate: 58, trades: 32, roi: 8.5, color: '#6366F1' },
-    { id: 3, name: 'Breakout Pro', status: 'paused', pnl: 750, winRate: 45, trades: 18, roi: 2.1, color: '#F59E0B' },
-]
-
-const quickStats = [
-    { label: 'Sharpe Ratio', value: '1.85', change: '+0.12', positive: true },
-    { label: 'Max Drawdown', value: '-4.2%', change: '-0.5%', positive: true },
-    { label: 'Avg Trade', value: '₹856', change: '+₹42', positive: true },
-]
-
 export default function TraderDashboard() {
     const [timeRange, setTimeRange] = useState('today')
     const [isRefreshing, setIsRefreshing] = useState(false)
+    const [positions, setPositions] = useState<any[]>([])
+    const [orders, setOrders] = useState<any[]>([])
+    const [strategies, setStrategies] = useState<any[]>([])
+    const [stats] = useState({
+        sharpeRatio: '1.85',
+        maxDrawdown: '-4.2%',
+        avgTrade: '₹856'
+    })
+
+    const fetchDashboardData = async () => {
+        setIsRefreshing(true)
+        try {
+            const [posData, ordData, strData] = await Promise.all([
+                positionsAPI.getAll(),
+                ordersAPI.getAll({ limit: 10 }),
+                strategiesAPI.getAll(),
+                ordersAPI.getStats()
+            ])
+
+            // Map API positions to UI format
+            setPositions(posData.positions.map(p => ({
+                symbol: p.symbol,
+                exchange: 'NSE', // Default for now
+                qty: p.quantity,
+                avgPrice: p.avgEntryPrice,
+                ltp: p.currentPrice,
+                pnl: p.unrealizedPnL,
+                pnlPct: p.pnlPercentage,
+                product: 'MIS', // Default
+                change: 0 // Not available in API yet
+            })))
+
+            // Map API orders to UI format
+            setOrders(ordData.orders.map(o => ({
+                id: o.orderId,
+                time: new Date(o.createdAt).toLocaleTimeString(),
+                symbol: o.symbol,
+                side: o.side,
+                qty: o.quantity,
+                price: o.price,
+                status: o.status,
+                type: 'LIMIT' // Default
+            })))
+
+            // Map API strategies to UI format
+            setStrategies(strData.strategies.map((s: any) => ({
+                id: s._id,
+                name: s.name,
+                status: s.isActive ? 'active' : 'paused',
+                pnl: s.metrics?.totalPnL || 0,
+                winRate: s.metrics?.winRate || 0,
+                trades: s.metrics?.totalTrades || 0,
+                roi: s.metrics?.profitFactor ? (s.metrics.profitFactor - 1) * 100 : 0,
+                color: s.isPaused ? '#F59E0B' : '#10B981'
+            })))
+
+            // Update stats if available (using order stats for avg trade count maybe?)
+            // setStats(...) 
+
+        } catch (error) {
+            console.error('Failed to fetch dashboard data:', error)
+        } finally {
+            setIsRefreshing(false)
+        }
+    }
+
+    useEffect(() => {
+        fetchDashboardData()
+    }, [])
 
     const totalPnl = positions.reduce((acc, p) => acc + p.pnl, 0)
-    const totalPnlPct = 2.3
-    const winRate = 68.5
+    const totalPnlPct = 2.3 // Calculate from capital base if available
+    const winRate = strategies.length > 0
+        ? Math.round(strategies.reduce((acc, s) => acc + s.winRate, 0) / strategies.length)
+        : 0
     const exposure = positions.reduce((acc, p) => acc + (p.ltp * p.qty), 0)
 
-    const handleRefresh = async () => {
-        setIsRefreshing(true)
-        await new Promise(r => setTimeout(r, 1000))
-        setIsRefreshing(false)
+    const handleRefresh = () => {
+        fetchDashboardData()
     }
+
+    const quickStats = [
+        { label: 'Sharpe Ratio', value: stats.sharpeRatio, change: '+0.12', positive: true },
+        { label: 'Max Drawdown', value: stats.maxDrawdown, change: '-0.5%', positive: true },
+        { label: 'Avg Trade', value: stats.avgTrade, change: '+₹42', positive: true },
+    ]
 
     return (
         <div className="trader-dashboard">
@@ -524,7 +573,7 @@ export default function TraderDashboard() {
                         </button>
                     </div>
                     <div className="orders-list">
-                        {recentOrders.map(order => (
+                        {orders.map(order => (
                             <div key={order.id} className="order-item">
                                 <div className="order-time">
                                     <Clock size={12} />

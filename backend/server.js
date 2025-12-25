@@ -45,6 +45,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/strategies', strategyRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/positions', positionRoutes);
+app.use('/api/market', require('./routes/market'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -56,10 +57,22 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// 404 handler
-app.use((req, res) => {
-    res.status(404).json({ error: 'Endpoint not found' });
-});
+// Serve static assets in production
+if (process.env.NODE_ENV === 'production') {
+    const path = require('path');
+    // Serve frontend build
+    app.use(express.static(path.join(__dirname, '../dist')));
+
+    // Handle React routing, return all requests to React app
+    app.get('*', (req, res) => {
+        res.sendFile(path.resolve(__dirname, '../dist', 'index.html'));
+    });
+} else {
+    // 404 handler for API only in dev
+    app.use((req, res) => {
+        res.status(404).json({ error: 'Endpoint not found' });
+    });
+}
 
 // Error handler
 app.use((err, req, res, next) => {

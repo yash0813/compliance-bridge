@@ -196,4 +196,81 @@ router.post('/logout', protect, async (req, res) => {
     }
 });
 
+/**
+ * @route   POST /api/auth/me/ips
+ * @desc    Add a static IP to whitelist
+ * @access  Private
+ */
+router.post('/me/ips', protect, [
+    body('ip').isIP().withMessage('Please enter a valid IP address'),
+    body('label').notEmpty().withMessage('Label is required')
+], async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
+        }
+
+        const { ip, label, location } = req.body;
+        const user = await User.findById(req.user._id);
+
+        // Check duplicates
+        if (user.whitelistedIPs.some(i => i.ip === ip)) {
+            return res.status(400).json({ error: 'IP already whitelisted' });
+        }
+
+        user.whitelistedIPs.push({
+            ip,
+            label,
+            location: location || 'Unknown',
+            verified: false // Requires manual/admin verification in real app
+        });
+
+        await user.save();
+
+        await AuditLog.create({
+            eventType: 'security_update',
+            userId: user._id,
+            userName: user.name,
+            userRole: user.role,
+            description: `Added IP to whitelist: ${ip}`,
+            sourceIP: req.ip
+        });
+
+        res.json({ success: true, ips: user.whitelistedIPs });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to add IP' });
+    }
+});
+
+/**
+ * @route   DELETE /api/auth/me/ips/:ipId
+ * @desc    Remove a static IP from whitelist
+ * @access  Private
+ */
+router.delete('/me/ips/:ipId', protect, async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+
+        user.whitelistedIPs = user.whitelistedIPs.filter(
+            ip => ip._id.toString() !== req.params.ipId
+        );
+
+        await user.save();
+
+        await AuditLog.create({
+            eventType: 'security_update',
+            userId: user._id,
+            userName: user.name,
+            userRole: user.role,
+            description: `Removed IP from whitelist`,
+            sourceIP: req.ip
+        });
+
+        res.json({ success: true, ips: user.whitelistedIPs });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to remove IP' });
+    }
+});
+
 module.exports = router;

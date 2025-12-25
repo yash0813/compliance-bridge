@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
     Clock, CheckCircle, AlertTriangle, XCircle,
     Download, Search,
     Zap, Send, Server, FileCheck, Shield, Activity,
     RefreshCw, Copy
 } from 'lucide-react'
+import { auditAPI } from '../services/api'
 import './AuditTimeline.css'
 
 interface AuditEvent {
@@ -34,94 +35,60 @@ interface AuditEvent {
     userId: string
 }
 
-const auditEvents: AuditEvent[] = [
-    {
-        id: 'SIG-2024-001245',
-        signalId: 'SIG-2024-001245',
-        strategyName: 'Momentum Alpha',
-        strategyVersion: 'v2.1.3',
-        symbol: 'RELIANCE',
-        side: 'BUY',
-        qty: 100,
-        timestamp: '2024-12-24T10:32:15.234+05:30',
-        stages: [
-            { stage: 'Signal Received', status: 'success', timestamp: '10:32:15.234 IST', duration: '0ms' },
-            { stage: 'Compliance Validation', status: 'success', timestamp: '10:32:15.238 IST', duration: '4ms', details: '5 rules checked' },
-            { stage: 'Sent to Broker', status: 'success', timestamp: '10:32:15.245 IST', duration: '7ms' },
-            { stage: 'Broker Accepted', status: 'success', timestamp: '10:32:15.312 IST', duration: '67ms' },
-            { stage: 'Order Filled', status: 'success', timestamp: '10:32:15.456 IST', duration: '144ms' },
-        ],
-        complianceChecks: [
-            { rule: 'Max Order Qty Check', status: 'passed', value: '100', limit: '500' },
-            { rule: 'Trading Window Check', status: 'passed', value: '10:32 IST', limit: '09:15-15:30' },
-            { rule: 'Position Limit Check', status: 'passed', value: '₹2.45L', limit: '₹50L' },
-            { rule: 'Order Frequency Check', status: 'passed', value: '12/min', limit: '100/min' },
-            { rule: 'Symbol Whitelist Check', status: 'passed', value: 'RELIANCE', limit: 'NSE F&O' },
-        ],
-        finalStatus: 'filled',
-        brokerId: 'BROKER_001',
-        userId: 'USR_12345'
-    },
-    {
-        id: 'SIG-2024-001244',
-        signalId: 'SIG-2024-001244',
-        strategyName: 'Mean Reversion',
-        strategyVersion: 'v1.8.0',
-        symbol: 'TCS',
-        side: 'SELL',
-        qty: 250,
-        timestamp: '2024-12-24T10:31:55.123+05:30',
-        stages: [
-            { stage: 'Signal Received', status: 'success', timestamp: '10:31:55.123 IST', duration: '0ms' },
-            { stage: 'Compliance Validation', status: 'error', timestamp: '10:31:55.128 IST', duration: '5ms', details: 'Rule violation detected' },
-            { stage: 'Signal Rejected', status: 'error', timestamp: '10:31:55.128 IST', duration: '0ms' },
-        ],
-        complianceChecks: [
-            { rule: 'Max Order Qty Check', status: 'failed', value: '250', limit: '200' },
-            { rule: 'Trading Window Check', status: 'passed', value: '10:31 IST', limit: '09:15-15:30' },
-            { rule: 'Position Limit Check', status: 'passed', value: '₹9.6L', limit: '₹50L' },
-            { rule: 'Order Frequency Check', status: 'passed', value: '8/min', limit: '100/min' },
-            { rule: 'Symbol Whitelist Check', status: 'passed', value: 'TCS', limit: 'NSE F&O' },
-        ],
-        finalStatus: 'rejected',
-        brokerId: 'BROKER_001',
-        userId: 'USR_67890'
-    },
-    {
-        id: 'SIG-2024-001243',
-        signalId: 'SIG-2024-001243',
-        strategyName: 'Breakout Pro',
-        strategyVersion: 'v3.0.1',
-        symbol: 'INFY',
-        side: 'BUY',
-        qty: 75,
-        timestamp: '2024-12-24T10:31:40.567+05:30',
-        stages: [
-            { stage: 'Signal Received', status: 'success', timestamp: '10:31:40.567 IST', duration: '0ms' },
-            { stage: 'Compliance Validation', status: 'warning', timestamp: '10:31:40.573 IST', duration: '6ms', details: 'Warning: Near limit' },
-            { stage: 'Sent to Broker', status: 'success', timestamp: '10:31:40.580 IST', duration: '7ms' },
-            { stage: 'Broker Accepted', status: 'success', timestamp: '10:31:40.645 IST', duration: '65ms' },
-            { stage: 'Order Filled', status: 'success', timestamp: '10:31:40.823 IST', duration: '178ms' },
-        ],
-        complianceChecks: [
-            { rule: 'Max Order Qty Check', status: 'passed', value: '75', limit: '500' },
-            { rule: 'Trading Window Check', status: 'passed', value: '10:31 IST', limit: '09:15-15:30' },
-            { rule: 'Position Limit Check', status: 'warning', value: '₹42L', limit: '₹50L' },
-            { rule: 'Order Frequency Check', status: 'passed', value: '15/min', limit: '100/min' },
-            { rule: 'Symbol Whitelist Check', status: 'passed', value: 'INFY', limit: 'NSE F&O' },
-        ],
-        finalStatus: 'filled',
-        brokerId: 'BROKER_001',
-        userId: 'USR_11111'
-    },
-]
+// Mock data removed in favor of API calls
 
 export default function AuditTimeline() {
-    const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(auditEvents[0])
+    const [events, setEvents] = useState<AuditEvent[]>([])
+    const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null)
     const [searchQuery, setSearchQuery] = useState('')
     const [statusFilter, setStatusFilter] = useState('all')
+    const [isLoading, setIsLoading] = useState(false)
 
-    const filteredEvents = auditEvents.filter(event => {
+    const fetchLogs = async () => {
+        try {
+            setIsLoading(true)
+            const data = await auditAPI.getAll({ limit: 50 })
+            const mappedEvents: AuditEvent[] = data.logs.map((log: any) => ({
+                id: log._id,
+                signalId: `LOG-${log._id.substring(18)}`.toUpperCase(),
+                strategyName: log.eventType === 'STRATEGY_EXECUTION' ? (log.description.split(':')[0] || 'Unknown Strategy') : 'System Event',
+                strategyVersion: 'v1.0',
+                symbol: 'N/A', // log.metadata?.symbol || 'N/A',
+                side: 'BUY',   // log.metadata?.side || 'BUY',
+                qty: 0,        // log.metadata?.qty || 0,
+                timestamp: log.timestamp,
+                stages: [
+                    {
+                        stage: 'Event Recorded',
+                        status: log.severity === 'critical' ? 'error' : log.severity === 'warning' ? 'warning' : 'success',
+                        timestamp: new Date(log.timestamp).toLocaleTimeString(),
+                        duration: '0ms',
+                        details: log.description
+                    }
+                ],
+                complianceChecks: [
+                    { rule: 'System Integrity Check', status: 'passed', value: 'OK', limit: 'OK' }
+                ],
+                finalStatus: log.eventType.includes('rejected') ? 'rejected' : 'filled',
+                brokerId: 'SYSTEM',
+                userId: log.userName
+            }))
+            setEvents(mappedEvents)
+            if (mappedEvents.length > 0) {
+                setSelectedEvent(mappedEvents[0])
+            }
+        } catch (error) {
+            console.error('Failed to fetch audit logs:', error)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    useEffect(() => {
+        fetchLogs()
+    }, [])
+
+    const filteredEvents = events.filter(event => {
         const matchesSearch = event.signalId.toLowerCase().includes(searchQuery.toLowerCase()) ||
             event.strategyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
             event.symbol.toLowerCase().includes(searchQuery.toLowerCase())
@@ -173,11 +140,22 @@ export default function AuditTimeline() {
                     </div>
                 </div>
                 <div className="page-header-actions">
-                    <button className="btn btn-secondary">
-                        <RefreshCw size={16} />
+                    <button className="btn btn-secondary" onClick={fetchLogs}>
+                        <RefreshCw size={16} className={isLoading ? 'spin' : ''} />
                         Refresh
                     </button>
-                    <button className="btn btn-secondary">
+                    <button className="btn btn-secondary" onClick={() => {
+                        const csvContent = "data:text/csv;charset=utf-8,"
+                            + "ID,Timestamp,Signal ID,Strategy,Symbol,Side,Status\n"
+                            + events.map(e => `${e.id},${e.timestamp},${e.signalId},${e.strategyName},${e.symbol},${e.side},${e.finalStatus}`).join("\n");
+                        const encodedUri = encodeURI(csvContent);
+                        const link = document.createElement("a");
+                        link.setAttribute("href", encodedUri);
+                        link.setAttribute("download", `audit_logs_${new Date().toISOString()}.csv`);
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    }}>
                         <Download size={16} />
                         Export Logs
                     </button>

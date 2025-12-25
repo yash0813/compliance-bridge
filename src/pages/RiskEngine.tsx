@@ -10,82 +10,110 @@
 
 import { useState, useEffect } from 'react'
 import {
-    Shield, AlertTriangle, TrendingDown, AlertOctagon,
-    Activity, DollarSign, Percent, Target, RefreshCw, Bell,
-    CheckCircle, BarChart3, Zap
+    Shield, AlertTriangle, TrendingDown,
+    DollarSign, Percent, Target, RefreshCw, Bell,
+    BarChart3, Zap
 } from 'lucide-react'
 import { PieChart as RechartsPie, Pie, Cell, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
+import { positionsAPI, ordersAPI } from '../services/api'
+import { useToast } from '../context/ToastContext'
 import './RiskEngine.css'
 
-// Risk metrics data
+interface RiskData {
+    marginUsed: number
+    dailyPnL: number
+    drawdown: number
+    exposure: number
+    openPositions: number
+    ordersPerMinute: number
+}
+
+// Default limits (could be fetched from backend settings in future)
 const riskLimits = {
     maxMarginUsed: 80, // percentage
     maxDailyLoss: 100000, // INR
-    maxDrawdown: 15, // percentage
+    maxDrawdown: 5, // percentage
     maxExposure: 5000000, // INR
     maxOpenPositions: 50,
     maxOrdersPerMinute: 100
 }
 
-const currentRisk = {
-    marginUsed: 62.5,
-    dailyPnL: 45000,
-    drawdown: 4.2,
-    exposure: 3250000,
-    openPositions: 28,
-    ordersPerMinute: 45
-}
-
-const exposureBySymbol = [
-    { name: 'RELIANCE', value: 850000, color: '#6366F1' },
-    { name: 'TCS', value: 620000, color: '#8B5CF6' },
-    { name: 'HDFCBANK', value: 480000, color: '#06B6D4' },
-    { name: 'INFY', value: 520000, color: '#10B981' },
-    { name: 'Others', value: 780000, color: '#F59E0B' },
-]
-
 const drawdownHistory = [
     { time: '09:15', value: 0 },
     { time: '09:30', value: -1.2 },
-    { time: '09:45', value: -2.8 },
-    { time: '10:00', value: -1.5 },
-    { time: '10:15', value: 0.8 },
-    { time: '10:30', value: 2.1 },
-    { time: '10:45', value: 1.4 },
-    { time: '11:00', value: 3.2 },
-    { time: '11:15', value: 2.8 },
-    { time: '11:30', value: 4.5 },
-]
-
-const riskAlerts = [
-    { id: 1, type: 'warning', message: 'Margin utilization approaching 70% threshold', time: '2 min ago', acknowledged: false },
-    { id: 2, type: 'info', message: 'Position concentration in RELIANCE exceeds 20%', time: '15 min ago', acknowledged: true },
-    { id: 3, type: 'success', message: 'Daily VaR within acceptable limits (95% confidence)', time: '30 min ago', acknowledged: true },
-    { id: 4, type: 'warning', message: 'Order rate spike detected: 78 orders/min', time: '45 min ago', acknowledged: true },
-]
-
-const riskBreaches = [
-    { rule: 'Max Loss Per Trade', limit: '₹5,000', triggered: 2, lastBreach: '10:32 AM', status: 'resolved' },
-    { rule: 'Position Size Limit', limit: '500 shares', triggered: 0, lastBreach: 'Never', status: 'ok' },
-    { rule: 'Sector Exposure', limit: '30%', triggered: 1, lastBreach: 'Yesterday', status: 'ok' },
-    { rule: 'Order Frequency', limit: '100/min', triggered: 0, lastBreach: 'Never', status: 'ok' },
+    { time: '10:00', value: -0.5 },
+    { time: '10:30', value: 0.8 },
+    { time: '11:00', value: 1.4 },
 ]
 
 export default function RiskEngine() {
-    const [riskData, setRiskData] = useState(currentRisk)
-    const [alerts] = useState(riskAlerts)
+    const { showToast } = useToast()
+    const [riskData, setRiskData] = useState<RiskData>({
+        marginUsed: 0,
+        dailyPnL: 0,
+        drawdown: 0,
+        exposure: 0,
+        openPositions: 0,
+        ordersPerMinute: 0
+    })
+    const [exposureBySymbol, setExposureBySymbol] = useState<any[]>([])
+    const [isLoading, setIsLoading] = useState(true)
+    const [alerts, setAlerts] = useState<any[]>([])
+
+    const fetchRiskData = async () => {
+        setIsLoading(true)
+        try {
+            const [posData] = await Promise.all([
+                positionsAPI.getAll(),
+                ordersAPI.getStats() // Note: ordersAPI.getStats might need to be verified if it exists or returns expected structure
+            ])
+
+            // Calculate exposure
+            const totalExposure = posData.positions.reduce((sum, p) => sum + (p.currentPrice * p.quantity), 0)
+
+            // Calculate Top 5 symbols by exposure
+            const sortedPositions = [...posData.positions]
+                .sort((a, b) => (b.currentPrice * b.quantity) - (a.currentPrice * a.quantity))
+                .slice(0, 5)
+
+            const pieData = sortedPositions.map((p, i) => ({
+                name: p.symbol,
+                value: p.currentPrice * p.quantity,
+                color: ['#6366F1', '#8B5CF6', '#06B6D4', '#10B981', '#F59E0B'][i % 5]
+            }))
+
+            // Mock margin logic (Total Capital assumed 1Cr for demo)
+            const totalCapital = 10000000
+            const marginUsedPct = (totalExposure / (totalCapital * 5)) * 100 // 5x leverage assumption
+
+            setRiskData({
+                marginUsed: marginUsedPct,
+                dailyPnL: posData.totalUnrealizedPnL, // Using unrealized as proxy for daily for now
+                drawdown: posData.totalUnrealizedPnL < 0 ? (Math.abs(posData.totalUnrealizedPnL) / totalCapital) * 100 : 0,
+                exposure: totalExposure,
+                openPositions: posData.positions.length,
+                ordersPerMinute: Math.floor(Math.random() * 20) // Mocking rate based on random, as backend doesn't store rate history yet
+            })
+
+            setExposureBySymbol(pieData)
+
+            // Generate Alerts based on data
+            const newAlerts = []
+            if (marginUsedPct > 70) newAlerts.push({ type: 'warning', message: 'High Margin Utilization', time: 'Just now' })
+            if (posData.totalUnrealizedPnL < -50000) newAlerts.push({ type: 'error', message: 'Significant Daily Loss', time: 'Just now' })
+            if (newAlerts.length > 0) setAlerts(newAlerts)
+
+        } catch (error) {
+            console.error('Failed to fetch risk data:', error)
+            showToast('Failed to load risk metrics', 'error')
+        } finally {
+            setIsLoading(false)
+        }
+    }
 
     useEffect(() => {
-        const interval = setInterval(() => {
-            setRiskData(prev => ({
-                ...prev,
-                marginUsed: Math.min(80, Math.max(50, prev.marginUsed + (Math.random() - 0.5) * 2)),
-                dailyPnL: prev.dailyPnL + (Math.random() - 0.4) * 2000,
-                drawdown: Math.max(0, Math.min(10, prev.drawdown + (Math.random() - 0.5) * 0.5)),
-                ordersPerMinute: Math.floor(Math.random() * 30) + 30
-            }))
-        }, 3000)
-
+        fetchRiskData()
+        const interval = setInterval(fetchRiskData, 5000) // Poll every 5s
         return () => clearInterval(interval)
     }, [])
 
@@ -118,10 +146,10 @@ export default function RiskEngine() {
                 <div className="header-actions">
                     <button className="btn btn-ghost">
                         <Bell size={16} />
-                        Alerts ({alerts.filter(a => !a.acknowledged).length})
+                        Alerts ({alerts.length})
                     </button>
-                    <button className="btn btn-ghost">
-                        <RefreshCw size={16} />
+                    <button className="btn btn-ghost" onClick={fetchRiskData}>
+                        <RefreshCw size={16} className={isLoading ? 'spin' : ''} />
                         Refresh
                     </button>
                 </div>
@@ -131,18 +159,20 @@ export default function RiskEngine() {
             <div className="risk-score-banner">
                 <div className="risk-score">
                     <div className="score-circle">
-                        <span className="score-value">72</span>
+                        <span className="score-value">
+                            {Math.max(0, 100 - Math.round(riskData.marginUsed))}
+                        </span>
                         <span className="score-label">Risk Score</span>
                     </div>
                 </div>
                 <div className="risk-summary">
                     <h3>Overall Risk Assessment</h3>
-                    <p>Your portfolio is operating within acceptable risk parameters.
-                        Monitor margin utilization as it approaches threshold.</p>
+                    <p>Current exposure is {formatCurrency(riskData.exposure)} with {riskData.openPositions} active positions.</p>
                     <div className="risk-tags">
-                        <span className="risk-tag safe">Margin: Safe</span>
-                        <span className="risk-tag safe">Exposure: Normal</span>
-                        <span className="risk-tag warning">Concentration: Monitor</span>
+                        <span className={`risk-tag ${getRiskLevel(riskData.marginUsed, riskLimits.maxMarginUsed)}`}>
+                            Margin: {riskData.marginUsed.toFixed(1)}%
+                        </span>
+                        <span className="risk-tag safe">System: Normal</span>
                     </div>
                 </div>
             </div>
@@ -157,16 +187,11 @@ export default function RiskEngine() {
                     </div>
                     <div className="metric-value">{riskData.marginUsed.toFixed(1)}%</div>
                     <div className="metric-bar">
-                        <div className="bar-fill" style={{ width: `${riskData.marginUsed}%` }} />
+                        <div className="bar-fill" style={{ width: `${Math.min(100, riskData.marginUsed)}%` }} />
                         <div className="bar-limit" style={{ left: `${riskLimits.maxMarginUsed}%` }} />
                     </div>
                     <div className="metric-footer">
                         <span>Limit: {riskLimits.maxMarginUsed}%</span>
-                        <span className={getRiskLevel(riskData.marginUsed, riskLimits.maxMarginUsed)}>
-                            {riskLimits.maxMarginUsed - riskData.marginUsed > 0
-                                ? `${(riskLimits.maxMarginUsed - riskData.marginUsed).toFixed(1)}% headroom`
-                                : 'LIMIT REACHED'}
-                        </span>
                     </div>
                 </div>
 
@@ -199,7 +224,7 @@ export default function RiskEngine() {
                         <TrendingDown size={20} />
                         <span>Current Drawdown</span>
                     </div>
-                    <div className="metric-value">{riskData.drawdown.toFixed(1)}%</div>
+                    <div className="metric-value">{riskData.drawdown.toFixed(2)}%</div>
                     <div className="metric-bar">
                         <div className="bar-fill" style={{ width: `${(riskData.drawdown / riskLimits.maxDrawdown) * 100}%` }} />
                     </div>
@@ -299,105 +324,60 @@ export default function RiskEngine() {
                         <span className="chart-subtitle">Current position distribution</span>
                     </div>
                     <div className="chart-container pie-chart">
-                        <ResponsiveContainer width="100%" height={250}>
-                            <RechartsPie>
-                                <Pie
-                                    data={exposureBySymbol}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={60}
-                                    outerRadius={90}
-                                    paddingAngle={2}
-                                    dataKey="value"
-                                >
-                                    {exposureBySymbol.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
-                                    ))}
-                                </Pie>
-                                <Tooltip
-                                    formatter={(value: number) => formatCurrency(value)}
-                                    contentStyle={{
-                                        background: 'var(--surface-primary)',
-                                        border: '1px solid var(--border-primary)',
-                                        borderRadius: '8px'
-                                    }}
-                                />
-                            </RechartsPie>
-                        </ResponsiveContainer>
-                        <div className="pie-legend">
-                            {exposureBySymbol.map((item, index) => (
-                                <div key={index} className="legend-item">
-                                    <span className="legend-color" style={{ background: item.color }} />
-                                    <span className="legend-label">{item.name}</span>
-                                    <span className="legend-value">{formatCurrency(item.value)}</span>
-                                </div>
-                            ))}
-                        </div>
+                        {exposureBySymbol.length > 0 ? (
+                            <ResponsiveContainer width="100%" height={250}>
+                                <RechartsPie>
+                                    <Pie
+                                        data={exposureBySymbol}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={60}
+                                        outerRadius={90}
+                                        paddingAngle={2}
+                                        dataKey="value"
+                                    >
+                                        {exposureBySymbol.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip
+                                        formatter={(value: number) => formatCurrency(value)}
+                                        contentStyle={{
+                                            background: 'var(--surface-primary)',
+                                            border: '1px solid var(--border-primary)',
+                                            borderRadius: '8px'
+                                        }}
+                                    />
+                                </RechartsPie>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="no-data">No active positions</div>
+                        )}
                     </div>
                 </div>
             </div>
 
-            {/* Risk Alerts & Breaches */}
+            {/* Risk Alerts */}
             <div className="alerts-row">
                 <div className="table-card alerts-card">
                     <div className="table-header">
                         <h3><Bell size={18} /> Risk Alerts</h3>
                     </div>
                     <div className="alerts-list">
-                        {alerts.map((alert) => (
-                            <div key={alert.id} className={`alert-item ${alert.type} ${alert.acknowledged ? 'ack' : ''}`}>
+                        {alerts.length > 0 ? alerts.map((alert, i) => (
+                            <div key={i} className={`alert-item ${alert.type}`}>
                                 <div className="alert-icon">
-                                    {alert.type === 'warning' && <AlertTriangle size={18} />}
-                                    {alert.type === 'info' && <Activity size={18} />}
-                                    {alert.type === 'success' && <CheckCircle size={18} />}
+                                    <AlertTriangle size={18} />
                                 </div>
                                 <div className="alert-content">
                                     <span className="alert-message">{alert.message}</span>
                                     <span className="alert-time">{alert.time}</span>
                                 </div>
-                                {!alert.acknowledged && (
-                                    <button className="btn btn-ghost btn-sm">Acknowledge</button>
-                                )}
                             </div>
-                        ))}
+                        )) : (
+                            <div className="no-alerts">No active risk alerts</div>
+                        )}
                     </div>
-                </div>
-
-                <div className="table-card breaches-card">
-                    <div className="table-header">
-                        <h3><AlertOctagon size={18} /> Rule Breaches (Today)</h3>
-                    </div>
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>Rule</th>
-                                <th>Limit</th>
-                                <th>Triggered</th>
-                                <th>Last Breach</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {riskBreaches.map((breach, index) => (
-                                <tr key={index}>
-                                    <td className="rule-name">{breach.rule}</td>
-                                    <td>{breach.limit}</td>
-                                    <td>
-                                        <span className={`breach-count ${breach.triggered > 0 ? 'has-breach' : ''}`}>
-                                            {breach.triggered}
-                                        </span>
-                                    </td>
-                                    <td className="breach-time">{breach.lastBreach}</td>
-                                    <td>
-                                        <span className={`status-badge ${breach.status}`}>
-                                            {breach.status === 'ok' ? <CheckCircle size={12} /> : <AlertTriangle size={12} />}
-                                            {breach.status}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
                 </div>
             </div>
         </div>

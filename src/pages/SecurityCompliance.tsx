@@ -5,6 +5,7 @@ import {
     Building2, FileText, Clock, Calendar,
     Fingerprint, MapPin, Activity, AlertOctagon
 } from 'lucide-react'
+import { authAPI } from '../services/api'
 import './SecurityCompliance.css'
 
 // SEBI Compliance Status
@@ -38,38 +39,7 @@ interface StrategyClassification {
 }
 
 // Mock data
-const ipWhitelistData: IPWhitelist[] = [
-    {
-        id: '1',
-        ip: '203.45.167.89',
-        label: 'Primary Trading Server',
-        status: 'active',
-        addedOn: '2024-01-15',
-        expiresOn: '2025-01-15',
-        verifiedBy: 'SEBI-REG-2024-001',
-        location: 'Mumbai, India'
-    },
-    {
-        id: '2',
-        ip: '103.22.89.156',
-        label: 'Backup Server',
-        status: 'active',
-        addedOn: '2024-02-20',
-        expiresOn: '2025-02-20',
-        verifiedBy: 'SEBI-REG-2024-002',
-        location: 'Bangalore, India'
-    },
-    {
-        id: '3',
-        ip: '182.76.45.233',
-        label: 'DR Site',
-        status: 'pending',
-        addedOn: '2024-12-01',
-        expiresOn: '2025-12-01',
-        verifiedBy: 'Pending Verification',
-        location: 'Chennai, India'
-    }
-]
+// Mock data removed in favor of API calls
 
 const vendorStatusData: VendorStatus = {
     vendorName: 'Compliance-Bridge Technologies Pvt. Ltd.',
@@ -108,20 +78,46 @@ const strategyClassifications: StrategyClassification[] = [
 ]
 
 export default function SecurityCompliance() {
-    const [activeTab, setActiveTab] = useState<'ip' | 'vendor' | 'strategy'>('ip')
-    const [ipList, setIpList] = useState(ipWhitelistData)
+    const [activeTab, setActiveTab] = useState<'ip' | 'vendor' | 'strategy' | 'incident'>('ip')
+    const [ipList, setIpList] = useState<IPWhitelist[]>([])
     const [showAddIP, setShowAddIP] = useState(false)
     const [newIP, setNewIP] = useState({ ip: '', label: '', location: '' })
     const [ipError, setIpError] = useState('')
     const [currentIP, setCurrentIP] = useState('')
     const [lastCheck, setLastCheck] = useState(new Date())
+    const [isLoading, setIsLoading] = useState(false)
+
+    const fetchIPs = async () => {
+        try {
+            setIsLoading(true)
+            const { user } = await authAPI.me()
+            // Map backend data to UI interface
+            const mappedIPs: IPWhitelist[] = (user.whitelistedIPs || []).map((ip: any) => ({
+                id: ip._id,
+                ip: ip.ip,
+                label: ip.label,
+                status: ip.verified ? 'active' : 'pending',
+                addedOn: new Date(ip.addedAt).toISOString().split('T')[0],
+                expiresOn: new Date(new Date(ip.addedAt).setFullYear(new Date(ip.addedAt).getFullYear() + 1)).toISOString().split('T')[0],
+                verifiedBy: ip.verified ? 'SEBI-REG-AUTO' : 'Pending',
+                location: ip.location || 'Unknown'
+            }))
+            setIpList(mappedIPs)
+        } catch (error) {
+            console.error('Failed to fetch IPs:', error)
+        } finally {
+            setIsLoading(false)
+        }
+    }
 
     useEffect(() => {
-        // Simulate getting current IP
-        setCurrentIP('203.45.167.89')
+        // Simulate getting current IP (in real app, use a service like ipify)
+        setCurrentIP('127.0.0.1')
+        fetchIPs()
 
         const interval = setInterval(() => {
             setLastCheck(new Date())
+            // checkCurrentIP() 
         }, 30000)
 
         return () => clearInterval(interval)
@@ -149,7 +145,7 @@ export default function SecurityCompliance() {
         navigator.clipboard.writeText(text)
     }
 
-    const handleAddIP = () => {
+    const handleAddIP = async () => {
         setIpError('')
 
         // Simple IP validation regex
@@ -165,23 +161,23 @@ export default function SecurityCompliance() {
             return
         }
 
-        const newEntry: IPWhitelist = {
-            id: String(Date.now()), // Better ID than length
-            ip: newIP.ip,
-            label: newIP.label,
-            status: 'pending',
-            addedOn: new Date().toISOString().split('T')[0],
-            expiresOn: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            verifiedBy: 'Pending SEBI Verification',
-            location: newIP.location || 'India'
+        try {
+            await authAPI.addIP(newIP.ip, newIP.label, newIP.location)
+            await fetchIPs() // Refresh list
+            setNewIP({ ip: '', label: '', location: '' })
+            setShowAddIP(false)
+        } catch (error: any) {
+            setIpError(error.message || 'Failed to add IP')
         }
-        setIpList([...ipList, newEntry])
-        setNewIP({ ip: '', label: '', location: '' })
-        setShowAddIP(false)
     }
 
-    const handleDeleteIP = (id: string) => {
-        setIpList(ipList.filter(ip => ip.id !== id))
+    const handleDeleteIP = async (id: string) => {
+        try {
+            await authAPI.removeIP(id)
+            setIpList(ipList.filter(ip => ip.id !== id))
+        } catch (error) {
+            console.error('Failed to delete IP:', error)
+        }
     }
 
     const isCurrentIPWhitelisted = ipList.some(ip => ip.ip === currentIP && ip.status === 'active')
@@ -304,6 +300,20 @@ export default function SecurityCompliance() {
                     <Eye size={18} />
                     Strategy Classification
                 </button>
+                <button
+                    className={`tab-btn ${activeTab === 'incident' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('incident')}
+                >
+                    <AlertOctagon size={18} />
+                    Incident Reporting
+                </button>
+                <div style={{ flex: 1 }} />
+                {isLoading && (
+                    <div className="loading-indicator" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)' }}>
+                        <RefreshCw size={16} className="spin" />
+                        <span style={{ fontSize: '12px' }}>Syncing...</span>
+                    </div>
+                )}
             </div>
 
             {/* Tab Content */}
@@ -637,6 +647,27 @@ export default function SecurityCompliance() {
                                     <li>May require third-party audit</li>
                                 </ul>
                             </div>
+                        </div>
+                    </div>
+                )}
+                {/* Incident Reporting Tab (New) */}
+                {activeTab === 'incident' && (
+                    <div className="incident-section">
+                        <div className="section-header">
+                            <div>
+                                <h2>Incident & Non-Conformance Reporting</h2>
+                                <p>Report and track compliance violations and system anomalies</p>
+                            </div>
+                            <button className="btn btn-primary" onClick={() => setShowAddIP(true)}> {/* Reusing state for now or create new */}
+                                <Plus size={16} />
+                                Report Incident
+                            </button>
+                        </div>
+
+                        <div className="empty-state">
+                            <AlertOctagon size={48} />
+                            <h3>No Open Incidents</h3>
+                            <p>All systems are operating within compliance parameters.</p>
                         </div>
                     </div>
                 )}

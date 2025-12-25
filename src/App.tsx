@@ -11,6 +11,7 @@
 
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useState, createContext, useContext } from 'react'
+import { ToastProvider } from './context/ToastContext'
 import Layout from './components/Layout'
 import TraderDashboard from './pages/TraderDashboard'
 import BrokerDashboard from './pages/BrokerDashboard'
@@ -34,6 +35,7 @@ import SignalGateway from './pages/SignalGateway'
 import OrderQueue from './pages/OrderQueue'
 import RiskEngine from './pages/RiskEngine'
 import BrokerAdapters from './pages/BrokerAdapters'
+import Policies from './pages/Policies'
 
 // Theme Context
 interface ThemeContextType {
@@ -108,43 +110,46 @@ function App() {
     return (
         <ThemeContext.Provider value={{ theme, toggleTheme }}>
             <UserContext.Provider value={{ user, setUser: handleSetUser, isAuthenticated: !!user }}>
-                <HashRouter>
-                    <Routes>
-                        <Route path="/login" element={<Login />} />
-                        <Route path="/" element={user ? <Layout /> : <Navigate to="/login" />}>
-                            <Route index element={
-                                user?.role === 'admin' ? <AdminDashboard /> :
-                                    user?.role === 'broker' ? <BrokerDashboard /> :
-                                        user?.role === 'regulator' ? <AuditTimeline /> :
-                                            <TraderDashboard />
-                            } />
-                            <Route path="dashboard" element={
-                                user?.role === 'admin' ? <AdminDashboard /> :
-                                    user?.role === 'broker' ? <BrokerDashboard /> :
-                                        user?.role === 'regulator' ? <AuditTimeline /> :
-                                            <TraderDashboard />
-                            } />
-                            <Route path="strategies" element={<Strategies />} />
-                            <Route path="orders" element={<Orders />} />
-                            <Route path="positions" element={<Positions />} />
-                            <Route path="compliance" element={<Compliance />} />
-                            <Route path="audit" element={<AuditLogs />} />
-                            <Route path="settings" element={<Settings />} />
-                            {/* New Enterprise Routes */}
-                            <Route path="audit-timeline" element={<AuditTimeline />} />
-                            <Route path="broker-health" element={<BrokerHealth />} />
-                            <Route path="strategy-compliance" element={<StrategyCompliance />} />
-                            <Route path="how-it-works" element={<HowItWorks />} />
-                            <Route path="security" element={<SecurityCompliance />} />
-                            <Route path="help" element={<Help />} />
-                            {/* JM Financial Architecture Routes */}
-                            <Route path="signal-gateway" element={<SignalGateway />} />
-                            <Route path="order-queue" element={<OrderQueue />} />
-                            <Route path="risk-engine" element={<RiskEngine />} />
-                            <Route path="broker-adapters" element={<BrokerAdapters />} />
-                        </Route>
-                    </Routes>
-                </HashRouter>
+                <ToastProvider>
+                    <HashRouter>
+                        <Routes>
+                            <Route path="/login" element={<Login />} />
+                            <Route path="/" element={user ? <Layout /> : <Navigate to="/login" />}>
+                                <Route index element={
+                                    user?.role === 'admin' ? <AdminDashboard /> :
+                                        user?.role === 'broker' ? <BrokerDashboard /> :
+                                            user?.role === 'regulator' ? <AuditTimeline /> :
+                                                <TraderDashboard />
+                                } />
+                                <Route path="dashboard" element={
+                                    user?.role === 'admin' ? <AdminDashboard /> :
+                                        user?.role === 'broker' ? <BrokerDashboard /> :
+                                            user?.role === 'regulator' ? <AuditTimeline /> :
+                                                <TraderDashboard />
+                                } />
+                                <Route path="strategies" element={<Strategies />} />
+                                <Route path="orders" element={<Orders />} />
+                                <Route path="positions" element={<Positions />} />
+                                <Route path="compliance" element={<Compliance />} />
+                                <Route path="audit" element={<AuditLogs />} />
+                                <Route path="settings" element={<Settings />} />
+                                {/* New Enterprise Routes */}
+                                <Route path="audit-timeline" element={<AuditTimeline />} />
+                                <Route path="broker-health" element={<BrokerHealth />} />
+                                <Route path="strategy-compliance" element={<StrategyCompliance />} />
+                                <Route path="how-it-works" element={<HowItWorks />} />
+                                <Route path="security" element={<SecurityCompliance />} />
+                                <Route path="help" element={<Help />} />
+                                {/* JM Financial Architecture Routes */}
+                                <Route path="signal-gateway" element={<SignalGateway />} />
+                                <Route path="order-queue" element={<OrderQueue />} />
+                                <Route path="risk-engine" element={<RiskEngine />} />
+                                <Route path="broker-adapters" element={<BrokerAdapters />} />
+                                <Route path="policies" element={<Policies />} />
+                            </Route>
+                        </Routes>
+                    </HashRouter>
+                </ToastProvider>
             </UserContext.Provider>
         </ThemeContext.Provider>
     )

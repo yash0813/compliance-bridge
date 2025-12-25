@@ -5,8 +5,10 @@
  * @description Centralized API client for backend communication
  */
 
+/// <reference types="vite/client" />
+
 // API Base URL - change this for production
-const API_BASE_URL = 'http://localhost:5001/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
 
 // Token management
 const getToken = (): string | null => {
@@ -65,6 +67,14 @@ interface User {
     avatar?: string;
     isActive: boolean;
     isPaused: boolean;
+    whitelistedIPs?: {
+        _id: string;
+        ip: string;
+        label: string;
+        location?: string;
+        verified: boolean;
+        addedAt: string;
+    }[];
 }
 
 export const authAPI = {
@@ -100,6 +110,37 @@ export const authAPI = {
     me: async (): Promise<{ success: boolean; user: User }> => {
         return apiRequest('/auth/me');
     },
+
+    addIP: async (ip: string, label: string, location?: string): Promise<{ success: boolean; ips: any[] }> => {
+        return apiRequest('/auth/me/ips', {
+            method: 'POST',
+            body: JSON.stringify({ ip, label, location }),
+        });
+    },
+
+    removeIP: async (ipId: string): Promise<{ success: boolean; ips: any[] }> => {
+        return apiRequest(`/auth/me/ips/${ipId}`, { method: 'DELETE' });
+    },
+};
+
+// ============ MARKET DATA API ============
+
+export interface MarketQuote {
+    symbol: string;
+    lastPrice: number;
+    change: number;
+    changePercent: number;
+    timestamp: string;
+}
+
+export const marketAPI = {
+    getQuote: async (symbol: string): Promise<MarketQuote> => {
+        return apiRequest(`/market/quote/${symbol}`);
+    },
+
+    getIndices: async (): Promise<MarketQuote[]> => {
+        return apiRequest('/market/indices');
+    }
 };
 
 // ============ ORDERS API ============
@@ -173,10 +214,13 @@ export const positionsAPI = {
 interface Strategy {
     _id: string;
     name: string;
+    description?: string;
     type: string;
+    isActive: boolean;
+    isPaused: boolean;
     certification: { status: string };
     version: string;
-    metrics: { totalTrades: number; winRate: number };
+    metrics: { totalTrades: number; winRate: number; totalPnL?: number; roi?: number };
 }
 
 export const strategiesAPI = {
@@ -188,6 +232,16 @@ export const strategiesAPI = {
         return apiRequest('/strategies', {
             method: 'POST',
             body: JSON.stringify(strategy),
+        });
+    },
+
+    updateStatus: async (strategyId: string, status: 'active' | 'paused'): Promise<void> => {
+        return apiRequest(`/strategies/${strategyId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                isPaused: status === 'paused',
+                isActive: true // Ensure it remains active (not archived)
+            }),
         });
     },
 

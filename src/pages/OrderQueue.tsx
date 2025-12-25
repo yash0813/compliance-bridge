@@ -14,9 +14,10 @@ import {
     Activity, Zap, Server, Package
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
+import { ordersAPI } from '../services/api'
 import './OrderQueue.css'
 
-// Mock queue data
+// Mock queue data for visualization (System Metrics)
 const queueDepthData = [
     { time: '09:15', depth: 45, processed: 120, pending: 15 },
     { time: '09:30', depth: 82, processed: 245, pending: 28 },
@@ -30,26 +31,6 @@ const queueDepthData = [
     { time: '11:30', depth: 85, processed: 480, pending: 28 },
 ]
 
-const generateQueueItem = () => {
-    const symbols = ['RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK', 'SBIN', 'BAJFINANCE']
-    const sides = ['BUY', 'SELL']
-    const statuses = ['queued', 'processing', 'sent', 'executed', 'rejected']
-    const brokers = ['Zerodha', 'Angel One', 'Upstox', 'ICICI Direct']
-
-    return {
-        id: `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        symbol: symbols[Math.floor(Math.random() * symbols.length)],
-        side: sides[Math.floor(Math.random() * sides.length)],
-        quantity: Math.floor(Math.random() * 500) + 50,
-        price: (Math.random() * 3000 + 500).toFixed(2),
-        status: statuses[Math.floor(Math.random() * statuses.length)],
-        broker: brokers[Math.floor(Math.random() * brokers.length)],
-        queueTime: Math.floor(Math.random() * 50) + 5,
-        priority: Math.floor(Math.random() * 3) + 1,
-        timestamp: new Date().toISOString()
-    }
-}
-
 const partitions = [
     { id: 0, name: 'Partition 0 (NSE-EQ)', messages: 1250, lag: 12, consumer: 'broker-consumer-1' },
     { id: 1, name: 'Partition 1 (NSE-FO)', messages: 890, lag: 5, consumer: 'broker-consumer-2' },
@@ -58,45 +39,61 @@ const partitions = [
 ]
 
 export default function OrderQueue() {
-    const [queueItems, setQueueItems] = useState<ReturnType<typeof generateQueueItem>[]>([])
+    const [queueItems, setQueueItems] = useState<any[]>([])
     const [isProcessing, setIsProcessing] = useState(true)
-    const [totalProcessed, setTotalProcessed] = useState(8542)
-    const [currentQueueDepth, setCurrentQueueDepth] = useState(85)
+    const [totalProcessed, setTotalProcessed] = useState(0)
+    const [currentQueueDepth, setCurrentQueueDepth] = useState(0)
     const [avgProcessingTime, setAvgProcessingTime] = useState(12.5)
 
+    const fetchQueueData = async () => {
+        try {
+            const response = await ordersAPI.getAll({ limit: 50 })
+            const orders = response.orders.map(o => ({
+                id: o.orderId || o._id,
+                symbol: o.symbol,
+                side: o.side,
+                quantity: o.quantity,
+                price: o.price,
+                status: o.status,
+                broker: o.broker,
+                queueTime: Math.floor(Math.random() * 50) + 5, // Mock latency
+                priority: 1, // Default
+                timestamp: o.createdAt
+            }))
+            setQueueItems(orders)
+            setCurrentQueueDepth(response.total > 50 ? 50 : response.total) // Just showing active view
+        } catch (error) {
+            console.error('Failed to fetch order queue:', error)
+        }
+    }
+
     useEffect(() => {
-        // Initialize queue with some items
-        const initialItems = Array.from({ length: 15 }, generateQueueItem)
-        setQueueItems(initialItems)
+        fetchQueueData()
     }, [])
 
     useEffect(() => {
         if (!isProcessing) return
 
         const interval = setInterval(() => {
-            // Add new item and process oldest
-            setQueueItems(prev => {
-                const newItem = generateQueueItem()
-                const updated = [newItem, ...prev.slice(0, 14)]
-                return updated
-            })
-            setTotalProcessed(prev => prev + Math.floor(Math.random() * 3) + 1)
-            setCurrentQueueDepth(Math.floor(Math.random() * 50) + 50)
+            // Poll for new data every 3 seconds to simulate "live" view
+            fetchQueueData()
+
+            // Simulate changing metrics
+            setTotalProcessed(prev => prev + Math.floor(Math.random() * 5))
             setAvgProcessingTime(prev => ((prev * 10 + Math.random() * 5 + 10) / 11))
-        }, 1200)
+        }, 3000)
 
         return () => clearInterval(interval)
     }, [isProcessing])
 
     const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'queued': return 'warning'
-            case 'processing': return 'info'
-            case 'sent': return 'primary'
-            case 'executed': return 'success'
-            case 'rejected': return 'error'
-            default: return 'default'
-        }
+        const s = status.toLowerCase()
+        if (s === 'queued' || s === 'pending') return 'warning'
+        if (s === 'processing' || s === 'open') return 'info'
+        if (s === 'sent') return 'primary'
+        if (s === 'executed' || s === 'filled') return 'success'
+        if (s === 'rejected' || s === 'cancelled') return 'error'
+        return 'default'
     }
 
     return (

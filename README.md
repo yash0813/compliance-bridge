@@ -80,31 +80,52 @@ Static IP whitelisting, vendor status, strategy classification
 
 ## 🛠️ Tech Stack
 
-- **Frontend:** React 18 + TypeScript
-- **Styling:** Custom CSS with CSS Variables (Dark Theme)
-- **Build Tool:** Vite 5
-- **Charts:** Recharts
-- **Icons:** Lucide React
+- **Frontend:** React 18 + TypeScript + Vite 5
+- **Backend:** Node.js + Express
+- **Database:** MongoDB (Local + In-Memory Fallback)
+- **Deployment:** Docker (Frontend + Backend + DB)
+- **Styling:** Custom CSS with CSS Variables (Enterprise Dark Theme)
 - **Desktop App:** Electron 39
-- **Router:** React Router v7
 
 ---
 
-## 📦 Installation
+## 📦 Installation & Deployment
+
+### Option 1: Docker (Recommended)
+Run the entire stack (Frontend + Backend + MongoDB) with one command:
 
 ```bash
-# Clone the repository
-git clone https://github.com/yash0813/compliance-bridge.git
-cd compliance-bridge
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
+docker-compose up --build
 ```
+Access the app at [http://localhost:5001](http://localhost:5001).
 
-Open (https://yash0813.github.io/compliance-bridge) in your browser.
+### Option 2: Manual Setup
+
+1. **Frontend:**
+   ```bash
+   npm install
+   npm run dev
+   ```
+
+2. **Backend:**
+   ```bash
+   cd backend
+   npm install
+   npm run dev
+   ```
+
+---
+
+## 🔑 Demo Accounts
+
+| Role | Email | Password |
+|------|-------|----------|
+| Trader | trader@demo.com | demo123 |
+| Broker | broker@demo.com | demo123 |
+| Admin | admin@demo.com | demo123 |
+| Regulator | regulator@demo.com | demo123 |
+
+All data is reset on server restart (if using In-Memory DB).
 
 ---
 
@@ -205,10 +226,11 @@ compliance-bridge/
 - [x] Strategy certification & versioning
 - [x] Security & SEBI compliance module
 - [x] Windows desktop application
-- [ ] Backend API integration
-- [ ] Real broker API connections
+- [x] Backend API integration
+- [x] Real broker API connections (Simulated via Adapters)
+- [x] Production deployment (Docker)
 - [ ] WebSocket real-time data
-- [ ] Production deployment
+- [ ] Document Control & Policy Workflow
 
 ---
 

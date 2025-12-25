@@ -37,6 +37,7 @@ const traderNavItems = [
     { path: '/strategy-compliance', icon: Award, label: 'Certification' },
     { path: '/positions', icon: Briefcase, label: 'Positions' },
     { path: '/orders', icon: FileText, label: 'Orders' },
+    { path: '/policies', icon: FileText, label: 'Policies' }, // Added
 ]
 
 const brokerNavItems = [
@@ -48,6 +49,7 @@ const brokerNavItems = [
     { path: '/broker-health', icon: Server, label: 'Control Center' },
     { path: '/security', icon: ShieldCheck, label: 'Security & IP' },
     { path: '/audit-timeline', icon: Activity, label: 'Audit Timeline' },
+    { path: '/policies', icon: FileText, label: 'Policies' }, // Added
 ]
 
 const adminNavItems = [
@@ -59,6 +61,7 @@ const adminNavItems = [
     { path: '/broker-health', icon: Server, label: 'Control Center' },
     { path: '/security', icon: ShieldCheck, label: 'Security & IP' },
     { path: '/audit-timeline', icon: Activity, label: 'Audit Timeline' },
+    { path: '/policies', icon: FileText, label: 'Policies' }, // Added
     { path: '/settings', icon: Settings, label: 'Settings' },
 ]
 
@@ -68,6 +71,7 @@ const regulatorNavItems = [
     { path: '/audit-timeline', icon: Activity, label: 'Audit Timeline' },
     { path: '/strategy-compliance', icon: Award, label: 'Certification' },
     { path: '/orders', icon: FileText, label: 'Order History' },
+    { path: '/policies', icon: FileText, label: 'Policies' }, // Added
     { path: '/how-it-works', icon: Info, label: 'How It Works' },
 ]
 
