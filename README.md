@@ -129,17 +129,6 @@ All data is reset on server restart (if using In-Memory DB).
 
 ---
 
-## 🔑 Demo Accounts
-
-| Role | Email | Password |
-|------|-------|----------|
-| Trader | trader@demo.com | demo123 |
-| Broker | broker@demo.com | demo123 |
-| Admin | admin@demo.com | demo123 |
-| Regulator | regulator@demo.com | demo123 |
-
----
-
 ## 🖥️ Build Desktop App (Windows)
 
 ```bash
