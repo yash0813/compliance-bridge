@@ -224,8 +224,14 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    justify-content: center;
     transition: all var(--transition-fast);
 }
+
+.action-btn svg {
+    pointer-events: none;
+}
+
 
 .action-btn.play {
     background: var(--success-100);
@@ -265,4 +271,67 @@
     .strategy-stats {
         grid-template-columns: repeat(2, 1fr);
     }
+}
+
+.strategy-card.menu-open {
+    z-index: 50;
+    position: relative;
+}
+
+/* Styling for dropdown */
+.dropdown-container {
+    position: relative;
+    display: inline-block;
+}
+
+.strategy-menu {
+    position: absolute;
+    top: 100%;
+    /* Drop down */
+    right: 0;
+    margin-top: 8px;
+    width: 160px;
+    background: var(--surface-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    z-index: 100;
+    padding: var(--space-1);
+    animation: fadeIn 0.15s ease-out;
+    transform-origin: top right;
+}
+
+.strategy-menu button {
+    width: 100%;
+    padding: 10px 12px;
+    text-align: left;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: var(--text-sm);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-radius: var(--radius-base);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.strategy-menu button:hover {
+    background: var(--surface-hover);
+}
+
+.strategy-menu button.text-danger {
+    color: var(--error-600);
+}
+
+.strategy-menu button.text-danger:hover {
+    background: var(--error-50);
+}
+
+.dropdown-container.header-menu .strategy-menu {
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    width: 160px;
 }

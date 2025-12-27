@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Plus, Play, Pause, Settings, Zap, MoreVertical, Search, Loader2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Plus, Play, Pause, Settings, Zap, MoreVertical, Search, Loader2, Trash2, Edit, Copy } from 'lucide-react'
 import { strategiesAPI } from '../services/api'
+import { useToast } from '../context/ToastContext'
 import './Strategies.css'
 
 interface StrategyData {
@@ -18,9 +20,49 @@ interface StrategyData {
 }
 
 export default function Strategies() {
+    const navigate = useNavigate()
     const [strategies, setStrategies] = useState<StrategyData[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
+    const [activeMenu, setActiveMenu] = useState<string | null>(null)
+
+    const { showToast } = useToast()
+
+    useEffect(() => {
+        const handleClickOutside = () => {
+            setActiveMenu(null);
+        }
+        document.addEventListener('click', handleClickOutside)
+        return () => document.removeEventListener('click', handleClickOutside)
+    }, [])
+
+    const handleDelete = async (id: string, name: string, e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent document listener from firing
+        e.preventDefault();
+
+        // Close menu immediately
+        setActiveMenu(null);
+
+        // Small timeout to allow menu to close visually before alert blocks thread
+        setTimeout(async () => {
+            if (!window.confirm(`Are you sure you want to delete "${name}"?`)) return;
+
+            try {
+                await strategiesAPI.delete(id);
+                setStrategies(prev => prev.filter(s => s.id !== id));
+                showToast('Strategy deleted successfully', 'success');
+            } catch (error: any) {
+                console.error('Failed to delete strategy:', error);
+                showToast(error.message || 'Failed to delete strategy', 'error');
+                fetchStrategies();
+            }
+        }, 50);
+    }
+
+    const toggleMenu = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation(); // Important: Prevent document click from closing it immediately
+        setActiveMenu(prev => prev === id ? null : id);
+    }
 
     const fetchStrategies = async () => {
         setIsLoading(true)
@@ -92,7 +134,7 @@ export default function Strategies() {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <button className="btn btn-primary">
+                    <button className="btn btn-primary" onClick={() => navigate('/strategies/new')}>
                         <Plus size={16} />
                         Add Strategy
                     </button>
@@ -107,7 +149,7 @@ export default function Strategies() {
             ) : (
                 <div className="strategies-grid">
                     {filteredStrategies.map(strategy => (
-                        <div key={strategy.id} className={`strategy-card ${strategy.status}`}>
+                        <div key={strategy.id} className={`strategy-card ${strategy.status} ${activeMenu === strategy.id ? 'menu-open' : ''}`}>
                             <div className="strategy-header">
                                 <div className="strategy-info">
                                     <div className="strategy-icon">
@@ -118,9 +160,30 @@ export default function Strategies() {
                                         <p>{strategy.description}</p>
                                     </div>
                                 </div>
-                                <button className="btn btn-ghost btn-sm">
-                                    <MoreVertical size={16} />
-                                </button>
+                                <div className="dropdown-container header-menu">
+                                    <button
+                                        className="btn btn-ghost btn-sm"
+                                        onClick={(e) => toggleMenu(`header-${strategy.id}`, e)}
+                                    >
+                                        <MoreVertical size={16} />
+                                    </button>
+                                    {activeMenu === `header-${strategy.id}` && (
+                                        <div className="strategy-menu" onClick={(e) => e.stopPropagation()}>
+                                            <button onClick={() => navigate(`/strategies/${strategy.id}/edit`)}>
+                                                <Edit size={14} /> Edit
+                                            </button>
+                                            <button onClick={() => navigate('/strategies/new')}>
+                                                <Copy size={14} /> Clone
+                                            </button>
+                                            <button
+                                                onClick={(e) => handleDelete(strategy.id, strategy.name, e)}
+                                                className="text-danger"
+                                            >
+                                                <Trash2 size={14} /> Delete
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="strategy-stats">
@@ -159,9 +222,30 @@ export default function Strategies() {
                                     >
                                         {strategy.status === 'active' ? <Pause size={16} /> : <Play size={16} />}
                                     </button>
-                                    <button className="action-btn settings">
-                                        <Settings size={16} />
-                                    </button>
+                                    <div className="dropdown-container">
+                                        <button
+                                            className="action-btn settings"
+                                            onClick={(e) => toggleMenu(strategy.id, e)}
+                                        >
+                                            <Settings size={16} />
+                                        </button>
+                                        {activeMenu === strategy.id && (
+                                            <div className="strategy-menu" onClick={(e) => e.stopPropagation()}>
+                                                <button onClick={() => navigate(`/strategies/${strategy.id}/edit`)}>
+                                                    <Edit size={14} /> Edit
+                                                </button>
+                                                <button onClick={() => navigate('/strategies/new')}>
+                                                    <Copy size={14} /> Clone
+                                                </button>
+                                                <button
+                                                    onClick={(e) => handleDelete(strategy.id, strategy.name, e)}
+                                                    className="text-danger"
+                                                >
+                                                    <Trash2 size={14} /> Delete
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>

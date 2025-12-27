@@ -248,6 +248,21 @@ export const strategiesAPI = {
     certify: async (strategyId: string): Promise<void> => {
         return apiRequest(`/strategies/${strategyId}/certify`, { method: 'PUT' });
     },
+
+    delete: async (strategyId: string): Promise<void> => {
+        return apiRequest(`/strategies/${strategyId}`, { method: 'DELETE' });
+    },
+
+    getById: async (strategyId: string): Promise<{ strategy: Strategy }> => {
+        return apiRequest(`/strategies/${strategyId}`);
+    },
+
+    update: async (strategyId: string, updates: Partial<Strategy>): Promise<{ strategy: Strategy }> => {
+        return apiRequest(`/strategies/${strategyId}`, {
+            method: 'PUT',
+            body: JSON.stringify(updates)
+        });
+    },
 };
 
 // ============ AUDIT API ============

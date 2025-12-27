@@ -55,7 +55,9 @@ router.post('/', protect, async (req, res) => {
         const {
             name, description, type = 'White Box',
             tradingPairs = [], exchange = 'NSE',
-            riskSettings = {}
+            riskSettings = {},
+            executionWindow = { startTime: '09:15', endTime: '15:30' },
+            capitalAllocation = 100000
         } = req.body;
 
         if (!name) {
@@ -70,6 +72,8 @@ router.post('/', protect, async (req, res) => {
             disclosureLevel: type === 'White Box' ? 'Full' : type === 'Black Box' ? 'None' : 'Partial',
             tradingPairs,
             exchange,
+            executionWindow,
+            capitalAllocation,
             riskSettings: {
                 maxPositionSize: riskSettings.maxPositionSize || 100,
                 maxLossPerTrade: riskSettings.maxLossPerTrade || 5000,
@@ -148,11 +152,24 @@ router.put('/:id', protect, async (req, res) => {
             return res.status(403).json({ error: 'Not authorized to update this strategy' });
         }
 
-        const { name, description, tradingPairs, riskSettings, isActive, isPaused } = req.body;
+        const {
+            name, description, tradingPairs, riskSettings,
+            isActive, isPaused, type, exchange,
+            executionWindow, capitalAllocation
+        } = req.body;
 
         if (name) strategy.name = name;
         if (description) strategy.description = description;
         if (tradingPairs) strategy.tradingPairs = tradingPairs;
+        if (exchange) strategy.exchange = exchange;
+        if (executionWindow) strategy.executionWindow = executionWindow;
+        if (capitalAllocation) strategy.capitalAllocation = capitalAllocation;
+
+        if (type) {
+            strategy.type = type;
+            strategy.disclosureLevel = type === 'White Box' ? 'Full' : type === 'Black Box' ? 'None' : 'Partial';
+        }
+
         if (riskSettings) strategy.riskSettings = { ...strategy.riskSettings, ...riskSettings };
         if (isActive !== undefined) strategy.isActive = isActive;
         if (isPaused !== undefined) strategy.isPaused = isPaused;
@@ -248,6 +265,47 @@ router.put('/:id/reject', protect, requireRole('admin', 'broker'), async (req, r
         res.json({ success: true, message: 'Strategy rejected', strategy });
     } catch (error) {
         res.status(500).json({ error: 'Failed to reject strategy' });
+    }
+});
+
+/**
+ * @route   DELETE /api/strategies/:id
+ * @desc    Delete a strategy
+ * @access  Private
+ */
+router.delete('/:id', protect, async (req, res) => {
+    try {
+        const strategy = await Strategy.findById(req.params.id);
+
+        if (!strategy) {
+            return res.status(404).json({ error: 'Strategy not found' });
+        }
+
+        // Check ownership or admin
+        if (req.user.role === 'trader' && strategy.userId.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ error: 'Not authorized to delete this strategy' });
+        }
+
+        await Strategy.deleteOne({ _id: req.params.id });
+
+        // Audit log
+        await AuditLog.create({
+            eventType: 'strategy_deleted',
+            userId: req.user._id,
+            userName: req.user.name,
+            userRole: req.user.role,
+            targetType: 'strategy',
+            targetId: strategy._id,
+            targetName: strategy.name,
+            description: `Strategy deleted: ${strategy.name}`,
+            severity: 'warning',
+            sourceIP: req.ip
+        });
+
+        res.json({ success: true, message: 'Strategy deleted successfully', id: req.params.id });
+    } catch (error) {
+        console.error('Delete error:', error);
+        res.status(500).json({ error: 'Failed to delete strategy' });
     }
 });
 

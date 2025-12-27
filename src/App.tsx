@@ -17,6 +17,7 @@ import TraderDashboard from './pages/TraderDashboard'
 import BrokerDashboard from './pages/BrokerDashboard'
 import AdminDashboard from './pages/AdminDashboard'
 import Strategies from './pages/Strategies'
+import StrategyBuilder from './pages/StrategyBuilder'
 import Orders from './pages/Orders'
 import Positions from './pages/Positions'
 import Compliance from './pages/Compliance'
@@ -128,6 +129,8 @@ function App() {
                                                 <TraderDashboard />
                                 } />
                                 <Route path="strategies" element={<Strategies />} />
+                                <Route path="strategies/new" element={<StrategyBuilder />} />
+                                <Route path="strategies/:id/edit" element={<StrategyBuilder />} />
                                 <Route path="orders" element={<Orders />} />
                                 <Route path="positions" element={<Positions />} />
                                 <Route path="compliance" element={<Compliance />} />

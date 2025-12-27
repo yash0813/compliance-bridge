@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useUser } from '../App'
 import {
     Search, Bell, Moon, Sun, Settings, ChevronDown,
@@ -32,6 +33,7 @@ const marketData = [
 ]
 
 export default function Header() {
+    const navigate = useNavigate()
     const { user } = useUser()
     const [marketDataState, setMarketData] = useState(marketData)
     const [theme, setTheme] = useState<'light' | 'dark'>('light')
@@ -263,19 +265,19 @@ export default function Header() {
                                         <div className="search-section">
                                             <h4>Quick Actions</h4>
                                             <div className="search-actions">
-                                                <button className="search-action-item">
+                                                <button className="search-action-item" onClick={() => { navigate('/strategies/new'); setShowSearch(false); }}>
                                                     <Zap size={16} />
                                                     <span>New Strategy</span>
                                                 </button>
-                                                <button className="search-action-item">
+                                                <button className="search-action-item" onClick={() => { navigate('/positions'); setShowSearch(false); }}>
                                                     <Activity size={16} />
                                                     <span>View Positions</span>
                                                 </button>
-                                                <button className="search-action-item">
+                                                <button className="search-action-item" onClick={() => { navigate('/compliance'); setShowSearch(false); }}>
                                                     <Shield size={16} />
                                                     <span>Compliance Check</span>
                                                 </button>
-                                                <button className="search-action-item">
+                                                <button className="search-action-item" onClick={() => { navigate('/settings'); setShowSearch(false); }}>
                                                     <Settings size={16} />
                                                     <span>Settings</span>
                                                 </button>

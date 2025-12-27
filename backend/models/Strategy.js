@@ -95,6 +95,14 @@ const strategySchema = new mongoose.Schema({
         enum: ['NSE', 'BSE', 'MCX', 'NFO'],
         default: 'NSE'
     },
+    executionWindow: {
+        startTime: { type: String, default: '09:15' },
+        endTime: { type: String, default: '15:30' }
+    },
+    capitalAllocation: {
+        type: Number,
+        default: 100000
+    },
     // Status
     isActive: {
         type: Boolean,
