@@ -63,6 +63,14 @@ const userSchema = new mongoose.Schema({
         addedAt: { type: Date, default: Date.now },
         verified: { type: Boolean, default: false }
     }],
+    riskSettings: {
+        maxMarginUsed: { type: Number, default: 80 },
+        maxDailyLoss: { type: Number, default: 100000 },
+        maxDrawdown: { type: Number, default: 5 },
+        maxExposure: { type: Number, default: 5000000 },
+        maxOpenPositions: { type: Number, default: 50 },
+        maxOrdersPerMinute: { type: Number, default: 100 }
+    },
     // Audit
     lastLogin: {
         type: Date,
@@ -100,6 +108,7 @@ userSchema.methods.toPublicJSON = function () {
         avatar: this.avatar,
         isActive: this.isActive,
         isPaused: this.isPaused,
+        riskSettings: this.riskSettings,
         createdAt: this.createdAt
     };
 };

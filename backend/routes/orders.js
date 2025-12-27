@@ -58,6 +58,14 @@ router.get('/', protect, async (req, res) => {
  * @desc    Place a new order
  * @access  Private
  */
+const riskService = require('../services/riskService');
+const brokerService = require('../services/brokerService');
+
+/**
+ * @route   POST /api/orders
+ * @desc    Place a new order
+ * @access  Private
+ */
 router.post('/', protect, async (req, res) => {
     try {
         const {
@@ -67,18 +75,37 @@ router.post('/', protect, async (req, res) => {
             strategyId = null
         } = req.body;
 
-        // Validation
+        // 1. Basic Validation
         if (!symbol || !side || !quantity) {
             return res.status(400).json({ error: 'Symbol, side, and quantity are required' });
         }
 
-        // Check if user is paused
-        if (req.user.isPaused) {
-            return res.status(403).json({ error: 'Trading is paused for your account' });
+        const orderDetails = { symbol, side, quantity, price };
+
+        // 2. Risk Engine Validation
+        const riskCheck = await riskService.validateOrder(req.user, orderDetails);
+
+        if (!riskCheck.passed) {
+            // Log the rejected attempt
+            await AuditLog.create({
+                eventType: 'order_rejected',
+                userId: req.user._id,
+                userName: req.user.name,
+                targetType: 'order',
+                description: `Risk Block: ${riskCheck.reason}`,
+                severity: 'warning',
+                sourceIP: req.ip
+            });
+
+            return res.status(400).json({
+                error: 'Order rejected by Risk Engine',
+                reason: riskCheck.reason
+            });
         }
 
-        // Create order
+        // 3. Create Order Record (Status: Queued)
         const order = await Order.create({
+            orderId: `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
             userId: req.user._id,
             strategyId,
             symbol: symbol.toUpperCase(),
@@ -97,38 +124,90 @@ router.post('/', protect, async (req, res) => {
                 priceCheck: true
             },
             complianceRules: [
-                { rule: 'Margin Check', passed: true, checkedAt: new Date() },
-                { rule: 'Position Limit', passed: true, checkedAt: new Date() },
-                { rule: 'Price Validation', passed: true, checkedAt: new Date() }
+                { rule: 'Risk Engine Validation', passed: true, checkedAt: new Date() }
             ]
         });
 
-        // Simulate order execution (in production, this would go to broker API)
-        setTimeout(async () => {
-            order.status = 'executed';
-            order.filledQty = order.quantity;
-            order.avgPrice = price || (Math.random() * 1000 + 500);
-            order.executedAt = new Date();
-            order.latencyMs = new Date() - order.queuedAt;
-            await order.save();
-        }, 500);
+        // 4. Send to Broker (Async Execution)
+        // In a real system, you might await this or use a queue. 
+        // We'll await it to give immediate feedback for this "Manual" trade.
+        const executionResult = await brokerService.placeOrder(order);
 
-        // Audit log
+        const Position = require('../models/Position');
+
+        // ...
+
+        // 5. Update Order with Result
+        order.status = executionResult.status;
+        if (executionResult.status === 'executed') {
+            order.filledQty = executionResult.filledQty;
+            order.avgPrice = executionResult.avgPrice;
+            order.executedAt = executionResult.executedAt;
+
+            // Update Position (Simple Netting for Demo)
+            let position = await Position.findOne({
+                userId: req.user._id,
+                symbol: order.symbol,
+                status: 'open'
+            });
+
+            if (position) {
+                if (position.side === order.side) {
+                    // Average Up
+                    const totalCost = (position.avgEntryPrice * position.quantity) + (order.avgPrice * order.filledQty);
+                    position.quantity += order.filledQty;
+                    position.avgEntryPrice = totalCost / position.quantity;
+                } else {
+                    // Reduce Position (simplification: not handling flip)
+                    if (order.filledQty >= position.quantity) {
+                        position.status = 'closed';
+                        position.quantity = 0; // Fully closed
+                        position.closedAt = new Date();
+                    } else {
+                        position.quantity -= order.filledQty;
+                    }
+                }
+                position.currentPrice = order.avgPrice; // Update mark-to-market
+                await position.save();
+            } else {
+                // Open new position
+                await Position.create({
+                    userId: req.user._id,
+                    symbol: order.symbol,
+                    side: order.side === 'BUY' ? 'LONG' : 'SHORT', // Map BUY/SELL to LONG/SHORT
+                    quantity: order.filledQty,
+                    avgEntryPrice: order.avgPrice,
+                    currentPrice: order.avgPrice,
+                    status: 'open',
+                    exchange: order.exchange,
+                    entryOrderId: order._id
+                });
+            }
+
+        } else {
+            order.rejectionReason = executionResult.rejectionReason;
+        }
+
+        order.latencyMs = new Date() - order.queuedAt;
+        await order.save();
+
+        // 6. Audit Log
+        const logType = order.status === 'executed' ? 'order_placed' : 'order_rejected';
         await AuditLog.create({
-            eventType: 'order_placed',
+            eventType: logType,
             userId: req.user._id,
             userName: req.user.name,
             userRole: req.user.role,
             targetType: 'order',
             targetId: order._id,
-            description: `${side} ${quantity} ${symbol} @ ${orderType}`,
-            metadata: { orderId: order.orderId, symbol, side, quantity, price },
+            description: `${order.status.toUpperCase()}: ${side} ${quantity} ${symbol}`,
+            metadata: { orderId: order.orderId, price: order.avgPrice },
             sourceIP: req.ip
         });
 
         res.status(201).json({
             success: true,
-            message: 'Order placed successfully',
+            message: order.status === 'executed' ? 'Order executed successfully' : 'Order rejected by broker',
             order
         });
 

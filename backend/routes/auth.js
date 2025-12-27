@@ -165,7 +165,8 @@ router.get('/me', protect, async (req, res) => {
         const user = await User.findById(req.user._id);
         res.json({
             success: true,
-            user: user.toPublicJSON()
+            user: user.toPublicJSON(),
+            tradingMode: process.env.TRADING_MODE || 'LIVE'
         });
     } catch (error) {
         res.status(500).json({ error: 'Failed to get user' });
@@ -270,6 +271,46 @@ router.delete('/me/ips/:ipId', protect, async (req, res) => {
         res.json({ success: true, ips: user.whitelistedIPs });
     } catch (error) {
         res.status(500).json({ error: 'Failed to remove IP' });
+    }
+});
+
+/**
+ * @route   PUT /api/auth/me/settings
+ * @desc    Update user settings (risk limits)
+ * @access  Private
+ */
+router.put('/me/settings', protect, async (req, res) => {
+    try {
+        const { riskSettings } = req.body;
+        const user = await User.findById(req.user._id);
+
+        if (riskSettings) {
+            // Safer merge for Mongoose nested objects
+            user.riskSettings = {
+                maxMarginUsed: riskSettings.maxMarginUsed ?? user.riskSettings.maxMarginUsed,
+                maxDailyLoss: riskSettings.maxDailyLoss ?? user.riskSettings.maxDailyLoss,
+                maxDrawdown: riskSettings.maxDrawdown ?? user.riskSettings.maxDrawdown,
+                maxExposure: riskSettings.maxExposure ?? user.riskSettings.maxExposure,
+                maxOpenPositions: riskSettings.maxOpenPositions ?? user.riskSettings.maxOpenPositions,
+                maxOrdersPerMinute: riskSettings.maxOrdersPerMinute ?? user.riskSettings.maxOrdersPerMinute
+            };
+        }
+
+        await user.save();
+
+        await AuditLog.create({
+            eventType: 'settings_update',
+            userId: user._id,
+            userName: user.name,
+            userRole: user.role,
+            description: 'Updated personal risk settings',
+            sourceIP: req.ip
+        });
+
+        res.json({ success: true, user: user.toPublicJSON() });
+    } catch (error) {
+        console.error('Settings Update Error:', error);
+        res.status(500).json({ error: 'Failed to update settings', details: error.message });
     }
 });
 

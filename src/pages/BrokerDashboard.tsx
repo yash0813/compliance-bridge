@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
     ShieldCheck, AlertTriangle, XCircle, Activity,
     Users, Clock, TrendingUp, Power, Zap,
@@ -7,6 +7,7 @@ import {
     Eye, Ban, Play
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
+import { systemAPI, ordersAPI, usersAPI } from '../services/api'
 import './BrokerDashboard.css'
 
 const complianceData = [
@@ -62,23 +63,58 @@ export default function BrokerDashboard() {
     const [showKillConfirm, setShowKillConfirm] = useState(false)
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [selectedTimeframe, setSelectedTimeframe] = useState('today')
+    const [stats, setStats] = useState({ users: 1234, ordersToday: 45678, complianceRate: 99.2 })
+    const [liveOrders, setLiveOrders] = useState<any[]>([])
 
-    const handleKillSwitch = () => {
-        if (!killSwitchActive) {
-            setShowKillConfirm(true)
-        } else {
-            setKillSwitchActive(false)
+    useEffect(() => {
+        fetchInitialData()
+        const interval = setInterval(fetchInitialData, 10000)
+        return () => clearInterval(interval)
+    }, [])
+
+    const fetchInitialData = async () => {
+        try {
+            const [settingsRes, ordersRes, usersRes] = await Promise.all([
+                systemAPI.getSettings(),
+                ordersAPI.getAll({ limit: 10 }),
+                usersAPI.getAll()
+            ])
+
+            if (settingsRes.success) setKillSwitchActive(settingsRes.settings.masterKillSwitch)
+            if (ordersRes.orders) setLiveOrders(ordersRes.orders)
+            if (usersRes.users) setStats(prev => ({ ...prev, users: usersRes.users.length }))
+
+        } catch (error) {
+            console.error("Dashboard fetch error:", error)
         }
     }
 
-    const confirmKill = () => {
-        setKillSwitchActive(true)
-        setShowKillConfirm(false)
+    const handleKillSwitch = async () => {
+        if (!killSwitchActive) {
+            setShowKillConfirm(true)
+        } else {
+            try {
+                await systemAPI.toggleKillSwitch(false)
+                setKillSwitchActive(false)
+            } catch (e) {
+                console.error("Failed to deactivate kill switch")
+            }
+        }
+    }
+
+    const confirmKill = async () => {
+        try {
+            await systemAPI.toggleKillSwitch(true)
+            setKillSwitchActive(true)
+            setShowKillConfirm(false)
+        } catch (e) {
+            console.error("Failed to activate kill switch")
+        }
     }
 
     const handleRefresh = async () => {
         setIsRefreshing(true)
-        await new Promise(r => setTimeout(r, 1000))
+        await fetchInitialData()
         setIsRefreshing(false)
     }
 
@@ -207,7 +243,7 @@ export default function BrokerDashboard() {
                     </div>
                     <div className="metric-body">
                         <span className="metric-label">Active Users</span>
-                        <span className="metric-value">1,234</span>
+                        <span className="metric-value">{stats.users.toLocaleString()}</span>
                         <div className="metric-change positive">
                             <ArrowUpRight size={14} />
                             <span>+12% from yesterday</span>
@@ -522,30 +558,34 @@ export default function BrokerDashboard() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {orderFlow.map(order => (
-                                    <tr key={order.id}>
-                                        <td className="time-cell">{order.time}</td>
+                                {(liveOrders.length > 0 ? liveOrders : orderFlow).map((order: any) => (
+                                    <tr key={order._id || order.id}>
+                                        <td className="time-cell">
+                                            {order.createdAt ? new Date(order.createdAt).toLocaleTimeString() : order.time}
+                                        </td>
                                         <td>
                                             <div className="user-cell">
-                                                <div className="user-avatar-mini">{order.userName.charAt(0)}</div>
+                                                <div className="user-avatar-mini">
+                                                    {order.userId?.name?.charAt(0) || 'U'}
+                                                </div>
                                                 <div className="user-info-mini">
-                                                    <span className="user-name-mini">{order.userName}</span>
-                                                    <span className="user-id-mini">{order.user}</span>
+                                                    <span className="user-name-mini">{order.userId?.name || order.userName || 'Anonymous'}</span>
+                                                    <span className="user-id-mini">{order.userId?._id?.substring(0, 8) || order.user}</span>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="strategy-cell">{order.strategy}</td>
+                                        <td className="strategy-cell">{order.strategyId?.name || order.strategy || 'Manual'}</td>
                                         <td className="symbol-cell">{order.symbol}</td>
                                         <td>
                                             <span className={`side-badge ${order.side.toLowerCase()}`}>
                                                 {order.side}
                                             </span>
                                         </td>
-                                        <td>{order.qty}</td>
-                                        <td className="price-cell">₹{order.price.toLocaleString()}</td>
+                                        <td>{order.quantity || order.qty}</td>
+                                        <td className="price-cell">₹{(order.price || 0).toLocaleString()}</td>
                                         <td>
-                                            <span className={`badge badge-${order.status === 'filled' ? 'success' :
-                                                order.status === 'pending' ? 'warning' : 'error'
+                                            <span className={`badge badge-${order.status === 'executed' || order.status === 'filled' ? 'success' :
+                                                order.status === 'pending' || order.status === 'queued' ? 'warning' : 'error'
                                                 }`}>
                                                 {order.status}
                                             </span>

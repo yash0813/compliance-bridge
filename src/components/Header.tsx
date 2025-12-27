@@ -46,12 +46,24 @@ export default function Header() {
     const [isSearching, setIsSearching] = useState(false)
     const notifRef = useRef<HTMLDivElement>(null)
     const searchRef = useRef<HTMLDivElement>(null)
+    const [tradingMode, setTradingMode] = useState<string>('PAPER')
 
     const unreadCount = notifications.filter(n => !n.read).length
 
     // Real Market Data Fetcher
     useEffect(() => {
+        const fetchSystemConfig = async () => {
+            try {
+                const { tradingMode } = await import('../services/api').then(m => m.authAPI.me())
+                if (tradingMode) setTradingMode(tradingMode)
+            } catch (e) {
+                console.error("Failed to fetch system config")
+            }
+        }
+        fetchSystemConfig()
+
         const fetchMarketData = async () => {
+            // ... existing fetch logic ...
             try {
                 // Fetch real data from backend proxy
                 const indices = await marketAPI.getIndices()
@@ -86,6 +98,7 @@ export default function Header() {
         const interval = setInterval(fetchMarketData, 20000)
         return () => clearInterval(interval)
     }, [])
+
 
     useEffect(() => {
         const savedTheme = localStorage.getItem('theme') as 'light' | 'dark'
@@ -299,9 +312,9 @@ export default function Header() {
                     </div>
 
                     {/* System Status */}
-                    <div className="system-status-badge">
-                        <span className="status-dot active pulse" />
-                        <span>Live</span>
+                    <div className={`system-status-badge ${tradingMode === 'LIVE' ? 'live' : 'paper'}`}>
+                        <span className={`status-dot active ${tradingMode === 'LIVE' ? 'pulse' : ''}`} />
+                        <span>{tradingMode === 'LIVE' ? 'LIVE MARKET' : 'PAPER TRADING'}</span>
                     </div>
 
                     {/* Theme Toggle */}

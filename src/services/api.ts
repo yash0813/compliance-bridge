@@ -107,7 +107,7 @@ export const authAPI = {
         removeToken();
     },
 
-    me: async (): Promise<{ success: boolean; user: User }> => {
+    me: async (): Promise<{ success: boolean; user: User; tradingMode?: string }> => {
         return apiRequest('/auth/me');
     },
 
@@ -121,6 +121,17 @@ export const authAPI = {
     removeIP: async (ipId: string): Promise<{ success: boolean; ips: any[] }> => {
         return apiRequest(`/auth/me/ips/${ipId}`, { method: 'DELETE' });
     },
+
+    updateSettings: async (riskSettings: any): Promise<{ success: boolean; user: User }> => {
+        return apiRequest('/auth/me/settings', {
+            method: 'PUT',
+            body: JSON.stringify({ riskSettings })
+        });
+    },
+
+    pauseAccount: async (userId: string): Promise<void> => {
+        return apiRequest(`/users/${userId}/pause`, { method: 'PUT' });
+    }
 };
 
 // ============ MARKET DATA API ============
@@ -327,6 +338,20 @@ export const checkAPIHealth = async (): Promise<boolean> => {
     }
 };
 
+// ============ SYSTEM API ============
+
+export const systemAPI = {
+    getSettings: async (): Promise<{ success: boolean; settings: any }> => {
+        return apiRequest('/system/settings');
+    },
+    toggleKillSwitch: async (active: boolean): Promise<{ success: boolean; masterKillSwitch: boolean }> => {
+        return apiRequest('/system/kill-switch', {
+            method: 'POST',
+            body: JSON.stringify({ active })
+        });
+    }
+};
+
 export default {
     auth: authAPI,
     orders: ordersAPI,
@@ -334,5 +359,6 @@ export default {
     strategies: strategiesAPI,
     audit: auditAPI,
     users: usersAPI,
+    system: systemAPI,
     checkHealth: checkAPIHealth,
 };

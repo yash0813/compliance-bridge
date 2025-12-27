@@ -134,11 +134,16 @@ router.put('/:id/unblock', protect, requireRole('admin', 'broker'), async (req, 
 
 /**
  * @route   PUT /api/users/:id/pause
- * @desc    Pause user trading (broker/admin)
+ * @desc    Pause user trading (Self or Admin/Broker)
  * @access  Private
  */
-router.put('/:id/pause', protect, requireRole('admin', 'broker'), async (req, res) => {
+router.put('/:id/pause', protect, async (req, res) => {
     try {
+        // Allow if admin/broker OR if pausing self
+        if (req.user.role !== 'admin' && req.user.role !== 'broker' && req.user._id.toString() !== req.params.id) {
+            return res.status(403).json({ error: 'Not authorized to pause this account' });
+        }
+
         const user = await User.findById(req.params.id);
 
         if (!user) {
@@ -148,7 +153,20 @@ router.put('/:id/pause', protect, requireRole('admin', 'broker'), async (req, re
         user.isPaused = true;
         await user.save();
 
-        res.json({ success: true, message: 'User trading paused' });
+        // Audit Log
+        await AuditLog.create({
+            eventType: 'account_paused',
+            userId: req.user._id,
+            userName: req.user.name,
+            userRole: req.user.role,
+            targetType: 'user',
+            targetId: user._id,
+            description: `Account paused (Kill Switch triggered)`,
+            severity: 'critical',
+            sourceIP: req.ip
+        });
+
+        res.json({ success: true, message: 'Account trading paused successfully' });
     } catch (error) {
         res.status(500).json({ error: 'Failed to pause user' });
     }

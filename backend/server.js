@@ -26,8 +26,15 @@ const app = express();
 connectDB();
 
 // Middleware
+const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://yash0813.github.io',
+    process.env.CLIENT_URL
+].filter(Boolean);
+
 app.use(cors({
-    origin: ['http://localhost:3000', 'http://localhost:5173', 'https://yash0813.github.io'],
+    origin: allowedOrigins,
     credentials: true
 }));
 app.use(express.json());
@@ -51,6 +58,7 @@ app.use('/api/strategies', strategyRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/positions', positionRoutes);
 app.use('/api/market', require('./routes/market'));
+app.use('/api/system', require('./routes/system'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

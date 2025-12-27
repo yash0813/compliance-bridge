@@ -12,10 +12,10 @@ import { useState, useEffect } from 'react'
 import {
     Shield, AlertTriangle, TrendingDown,
     DollarSign, Percent, Target, RefreshCw, Bell,
-    BarChart3, Zap
+    BarChart3, Zap, Settings, Power
 } from 'lucide-react'
 import { PieChart as RechartsPie, Pie, Cell, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
-import { positionsAPI, ordersAPI } from '../services/api'
+import { positionsAPI, authAPI } from '../services/api'
 import { useToast } from '../context/ToastContext'
 import './RiskEngine.css'
 
@@ -28,14 +28,13 @@ interface RiskData {
     ordersPerMinute: number
 }
 
-// Default limits (could be fetched from backend settings in future)
-const riskLimits = {
-    maxMarginUsed: 80, // percentage
-    maxDailyLoss: 100000, // INR
-    maxDrawdown: 5, // percentage
-    maxExposure: 5000000, // INR
-    maxOpenPositions: 50,
-    maxOrdersPerMinute: 100
+interface RiskSettings {
+    maxMarginUsed: number
+    maxDailyLoss: number
+    maxDrawdown: number
+    maxExposure: number
+    maxOpenPositions: number
+    maxOrdersPerMinute: number
 }
 
 const drawdownHistory = [
@@ -56,29 +55,44 @@ export default function RiskEngine() {
         openPositions: 0,
         ordersPerMinute: 0
     })
+    const [riskLimits, setRiskLimits] = useState<RiskSettings>({
+        maxMarginUsed: 80,
+        maxDailyLoss: 100000,
+        maxDrawdown: 5,
+        maxExposure: 5000000,
+        maxOpenPositions: 50,
+        maxOrdersPerMinute: 100
+    })
     const [exposureBySymbol, setExposureBySymbol] = useState<any[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [alerts, setAlerts] = useState<any[]>([])
+    const [showConfig, setShowConfig] = useState(false)
+    const [currentUser, setCurrentUser] = useState<any>(null)
 
-    const fetchRiskData = async () => {
+    const fetchData = async () => {
         setIsLoading(true)
         try {
-            const [posData] = await Promise.all([
+            const [posData, userRes] = await Promise.all([
                 positionsAPI.getAll(),
-                ordersAPI.getStats() // Note: ordersAPI.getStats might need to be verified if it exists or returns expected structure
+                authAPI.me()
             ])
 
+            setCurrentUser(userRes.user)
+            if (userRes.user.riskSettings) {
+                setRiskLimits(userRes.user.riskSettings as any)
+            }
+
             // Calculate exposure
-            const totalExposure = posData.positions.reduce((sum, p) => sum + (p.currentPrice * p.quantity), 0)
+            const totalExposure = posData.positions.reduce((sum, p) => sum + (p.currentPrice * Math.abs(p.quantity)), 0)
 
             // Calculate Top 5 symbols by exposure
             const sortedPositions = [...posData.positions]
-                .sort((a, b) => (b.currentPrice * b.quantity) - (a.currentPrice * a.quantity))
+                .sort((a, b) => (b.currentPrice * Math.abs(b.quantity)) - (a.currentPrice * Math.abs(a.quantity)))
                 .slice(0, 5)
 
             const pieData = sortedPositions.map((p, i) => ({
                 name: p.symbol,
-                value: p.currentPrice * p.quantity,
+                value: p.currentPrice * Math.abs(p.quantity),
                 color: ['#6366F1', '#8B5CF6', '#06B6D4', '#10B981', '#F59E0B'][i % 5]
             }))
 
@@ -88,20 +102,20 @@ export default function RiskEngine() {
 
             setRiskData({
                 marginUsed: marginUsedPct,
-                dailyPnL: posData.totalUnrealizedPnL, // Using unrealized as proxy for daily for now
+                dailyPnL: posData.totalUnrealizedPnL,
                 drawdown: posData.totalUnrealizedPnL < 0 ? (Math.abs(posData.totalUnrealizedPnL) / totalCapital) * 100 : 0,
                 exposure: totalExposure,
                 openPositions: posData.positions.length,
-                ordersPerMinute: Math.floor(Math.random() * 20) // Mocking rate based on random, as backend doesn't store rate history yet
+                ordersPerMinute: Math.floor(Math.random() * 20)
             })
 
             setExposureBySymbol(pieData)
 
-            // Generate Alerts based on data
+            // Generate Alerts
             const newAlerts = []
-            if (marginUsedPct > 70) newAlerts.push({ type: 'warning', message: 'High Margin Utilization', time: 'Just now' })
-            if (posData.totalUnrealizedPnL < -50000) newAlerts.push({ type: 'error', message: 'Significant Daily Loss', time: 'Just now' })
-            if (newAlerts.length > 0) setAlerts(newAlerts)
+            if (marginUsedPct > riskLimits.maxMarginUsed * 0.9) newAlerts.push({ type: 'warning', message: 'High Margin Utilization', time: 'Just now' })
+            if (Math.abs(posData.totalUnrealizedPnL) > riskLimits.maxDailyLoss * 0.8) newAlerts.push({ type: 'error', message: 'Approaching Daily Loss Limit', time: 'Just now' })
+            setAlerts(newAlerts)
 
         } catch (error) {
             console.error('Failed to fetch risk data:', error)
@@ -111,13 +125,37 @@ export default function RiskEngine() {
         }
     }
 
+    const handleSaveConfig = async () => {
+        try {
+            await authAPI.updateSettings(riskLimits)
+            setShowConfig(false)
+            showToast('Risk limits updated successfully', 'success')
+            fetchData()
+        } catch (error) {
+            showToast('Failed to update limits', 'error')
+        }
+    }
+
+    const handleKillSwitch = async () => {
+        if (!window.confirm('EMERGENCY: This will PAUSE your account and prevent all new orders. Continue?')) return
+
+        try {
+            await authAPI.pauseAccount(currentUser.id)
+            showToast('ACCOUNT PAUSED - KILL SWITCH ACTIVATED', 'error')
+            fetchData()
+        } catch (error) {
+            showToast('Failed to activate kill switch', 'error')
+        }
+    }
+
     useEffect(() => {
-        fetchRiskData()
-        const interval = setInterval(fetchRiskData, 5000) // Poll every 5s
+        fetchData()
+        const interval = setInterval(fetchData, 5000)
         return () => clearInterval(interval)
     }, [])
 
     const getRiskLevel = (current: number, limit: number) => {
+        if (limit === 0) return 'safe'
         const ratio = current / limit
         if (ratio >= 0.9) return 'critical'
         if (ratio >= 0.7) return 'warning'
@@ -130,27 +168,82 @@ export default function RiskEngine() {
         return `₹${value.toFixed(0)}`
     }
 
+    if (showConfig) {
+        return (
+            <div className="risk-engine-page">
+                <div className="page-header">
+                    <h1>Configuration</h1>
+                </div>
+                <div className="card" style={{ maxWidth: '600px', margin: '0 auto', padding: '20px' }}>
+                    <h3>Edit Risk Limits</h3>
+                    <div className="form-group" style={{ marginBottom: '15px' }}>
+                        <label>Max Daily Loss (₹)</label>
+                        <input
+                            type="number"
+                            className="form-input"
+                            value={riskLimits.maxDailyLoss}
+                            onChange={e => setRiskLimits({ ...riskLimits, maxDailyLoss: Number(e.target.value) })}
+                        />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '15px' }}>
+                        <label>Max Exposure (₹)</label>
+                        <input
+                            type="number"
+                            className="form-input"
+                            value={riskLimits.maxExposure}
+                            onChange={e => setRiskLimits({ ...riskLimits, maxExposure: Number(e.target.value) })}
+                        />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '15px' }}>
+                        <label>Max Margin %</label>
+                        <input
+                            type="number"
+                            className="form-input"
+                            value={riskLimits.maxMarginUsed}
+                            onChange={e => setRiskLimits({ ...riskLimits, maxMarginUsed: Number(e.target.value) })}
+                        />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '15px' }}>
+                        <label>Max Open Positions</label>
+                        <input
+                            type="number"
+                            className="form-input"
+                            value={riskLimits.maxOpenPositions}
+                            onChange={e => setRiskLimits({ ...riskLimits, maxOpenPositions: Number(e.target.value) })}
+                        />
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                        <button className="btn btn-primary" onClick={handleSaveConfig}>Save Changes</button>
+                        <button className="btn btn-secondary" onClick={() => setShowConfig(false)}>Cancel</button>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="risk-engine-page">
-            {/* Page Header */}
             <div className="page-header">
                 <div className="header-content">
                     <div className="header-icon risk">
                         <Shield size={28} />
                     </div>
                     <div>
-                        <h1>Risk Engine</h1>
+                        <h1>Risk Engine {currentUser?.isPaused && <span style={{ color: 'red' }}>(PAUSED)</span>}</h1>
                         <p>Real-time risk monitoring, margin management, and exposure limits</p>
                     </div>
                 </div>
                 <div className="header-actions">
-                    <button className="btn btn-ghost">
-                        <Bell size={16} />
-                        Alerts ({alerts.length})
+                    <button className="btn btn-secondary" onClick={() => setShowConfig(true)}>
+                        <Settings size={16} />
+                        Configure
                     </button>
-                    <button className="btn btn-ghost" onClick={fetchRiskData}>
+                    <button className="btn btn-danger" onClick={handleKillSwitch}>
+                        <Power size={16} />
+                        KILL SWITCH
+                    </button>
+                    <button className="btn btn-ghost" onClick={fetchData}>
                         <RefreshCw size={16} className={isLoading ? 'spin' : ''} />
-                        Refresh
                     </button>
                 </div>
             </div>
@@ -172,7 +265,11 @@ export default function RiskEngine() {
                         <span className={`risk-tag ${getRiskLevel(riskData.marginUsed, riskLimits.maxMarginUsed)}`}>
                             Margin: {riskData.marginUsed.toFixed(1)}%
                         </span>
-                        <span className="risk-tag safe">System: Normal</span>
+                        {currentUser?.isPaused ? (
+                            <span className="risk-tag critical">Account Paused</span>
+                        ) : (
+                            <span className="risk-tag safe">System: Active</span>
+                        )}
                     </div>
                 </div>
             </div>
@@ -196,7 +293,7 @@ export default function RiskEngine() {
                 </div>
 
                 {/* Daily P&L */}
-                <div className={`metric-card ${riskData.dailyPnL >= 0 ? 'safe' : 'warning'}`}>
+                <div className={`metric-card ${Math.abs(riskData.dailyPnL) > riskLimits.maxDailyLoss ? 'critical' : 'safe'}`}>
                     <div className="metric-header">
                         <DollarSign size={20} />
                         <span>Daily P&L</span>

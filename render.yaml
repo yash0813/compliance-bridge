@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: compliance-bridge
+    env: docker
+    plan: free
+    region: singapore
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5001
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false # Set this in Render dashboard
+      - key: CLIENT_URL
+        fromService:
+          name: compliance-bridge
+          type: web
+          property: host
+    healthCheckPath: /api/health

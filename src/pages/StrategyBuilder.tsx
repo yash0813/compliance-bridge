@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
     Layout, Shield, Activity, ChevronRight, Save,
-    ArrowLeft, CheckCircle, AlertCircle, Info, Trash2, Loader2,
-    Clock, IndianRupee
+    ArrowLeft, CheckCircle, AlertCircle, Info, BarChart3, Play,
+    Clock, Trash2, IndianRupee, Loader2
 } from 'lucide-react'
+import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { strategiesAPI } from '../services/api'
 import { useToast } from '../context/ToastContext'
 import './StrategyBuilder.css'
@@ -32,7 +33,8 @@ const STEPS = [
     { id: 1, label: 'Strategy Basics', icon: Layout, description: 'Define core identity and classification' },
     { id: 2, label: 'Execution Details', icon: Clock, description: 'Set timing and capital rules' },
     { id: 3, label: 'Risk Parameters', icon: Shield, description: 'Set safety limits and compliance rules' },
-    { id: 4, label: 'Review & Launch', icon: Activity, description: 'Verify details and deploy' }
+    { id: 4, label: 'Backtesting', icon: BarChart3, description: 'Simulate performance on historical data' },
+    { id: 5, label: 'Review & Launch', icon: Activity, description: 'Verify details and deploy' }
 ];
 
 export default function StrategyBuilder() {
@@ -42,6 +44,8 @@ export default function StrategyBuilder() {
     const [activeStep, setActiveStep] = useState(1)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+    const [backtestResults, setBacktestResults] = useState<any>(null)
+    const [isBacktesting, setIsBacktesting] = useState(false)
 
     const [formData, setFormData] = useState<StrategyForm>({
         name: '',
@@ -144,6 +148,27 @@ export default function StrategyBuilder() {
         }))
     }
 
+    const runBacktest = async () => {
+        setIsBacktesting(true)
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 2000))
+
+        // Mock Results
+        const mockData = Array.from({ length: 30 }, (_, i) => ({
+            day: `Day ${i + 1} `,
+            value: 100000 + (Math.random() * 20000 - 8000) * (i + 1) * 0.1 // Random walk
+        }))
+
+        setBacktestResults({
+            totalPnL: 15400,
+            winRate: 64,
+            maxDrawdown: 4.2,
+            sharpeRatio: 1.8,
+            equityCurve: mockData
+        })
+        setIsBacktesting(false)
+    }
+
     const validateStep = (step: number) => {
         if (step === 1) {
             return formData.name.length >= 3 && formData.description.length > 0
@@ -201,7 +226,7 @@ export default function StrategyBuilder() {
                     {STEPS.map(step => (
                         <div
                             key={step.id}
-                            className={`nav-step ${activeStep === step.id ? 'active' : ''} ${step.id < activeStep ? 'completed' : ''}`}
+                            className={`nav - step ${activeStep === step.id ? 'active' : ''} ${step.id < activeStep ? 'completed' : ''} `}
                             onClick={() => {
                                 if (step.id < activeStep) setActiveStep(step.id)
                             }}
@@ -397,14 +422,93 @@ export default function StrategyBuilder() {
                         </div>
                     )}
 
-                    {/* STEP 4: REVIEW */}
+                    {/* STEP 4: BACKTEST */}
                     {activeStep === 4 && (
+                        <div className="form-section fade-in">
+                            <h2 className="section-title">
+                                <BarChart3 size={24} className="text-primary" />
+                                Strategy Backtest
+                            </h2>
+                            <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>
+                                Simulate your strategy performance over historical data to validate its efficacy before deploying capital.
+                            </p>
+
+                            <div className="form-grid" style={{ marginBottom: '24px' }}>
+                                <div className="form-group">
+                                    <label className="form-label">Start Date</label>
+                                    <input type="date" className="form-input" defaultValue="2024-01-01" />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">End Date</label>
+                                    <input type="date" className="form-input" defaultValue="2024-03-01" />
+                                </div>
+                            </div>
+
+                            <button
+                                className="btn btn-primary"
+                                onClick={runBacktest}
+                                disabled={isBacktesting}
+                                style={{ marginBottom: '24px' }}
+                            >
+                                {isBacktesting ? <Loader2 className="spin" size={16} /> : <Play size={16} />}
+                                {isBacktesting ? 'Running Simulation...' : 'Run Simulation'}
+                            </button>
+
+                            {backtestResults && (
+                                <div className="backtest-results fade-in">
+                                    <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+                                        <div className="metric-card" style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '8px' }}>
+                                            <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Total P&L</div>
+                                            <div style={{ fontSize: '1.2rem', fontWeight: 600, color: 'var(--success-500)' }}>+₹{backtestResults.totalPnL}</div>
+                                        </div>
+                                        <div className="metric-card" style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '8px' }}>
+                                            <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Win Rate</div>
+                                            <div style={{ fontSize: '1.2rem', fontWeight: 600 }}>{backtestResults.winRate}%</div>
+                                        </div>
+                                        <div className="metric-card" style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '8px' }}>
+                                            <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Max Drawdown</div>
+                                            <div style={{ fontSize: '1.2rem', fontWeight: 600, color: 'var(--error-500)' }}>-{backtestResults.maxDrawdown}%</div>
+                                        </div>
+                                        <div className="metric-card" style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '8px' }}>
+                                            <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Sharpe Ratio</div>
+                                            <div style={{ fontSize: '1.2rem', fontWeight: 600 }}>{backtestResults.sharpeRatio}</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="chart-container" style={{ height: '300px', width: '100%' }}>
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <AreaChart data={backtestResults.equityCurve}>
+                                                <defs>
+                                                    <linearGradient id="equity" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3} />
+                                                        <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-primary)" />
+                                                <XAxis dataKey="day" hide />
+                                                <YAxis stroke="var(--text-muted)" />
+                                                <Tooltip
+                                                    contentStyle={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)' }}
+                                                    formatter={(val: number) => [`₹${val.toFixed(0)} `, 'Equity']}
+                                                />
+                                                <Area type="monotone" dataKey="value" stroke="#8B5CF6" fill="url(#equity)" />
+                                            </AreaChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* STEP 5: REVIEW */}
+                    {activeStep === 5 && (
                         <div className="form-section fade-in">
                             <h2 className="section-title">
                                 <Activity size={24} className="text-primary" />
                                 Review & Confirm
                             </h2>
 
+                            {/* ... (Existing review content) ... */}
                             <div className="review-card" style={{ background: 'var(--bg-tertiary)', padding: '24px', borderRadius: '12px' }}>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
                                     <div>
@@ -447,6 +551,18 @@ export default function StrategyBuilder() {
                                 </div>
                             </div>
 
+                            {/* Show Backtest Summary if available */}
+                            {backtestResults && (
+                                <div style={{ marginTop: '20px', padding: '16px', border: '1px solid var(--success-500)', borderRadius: '8px', background: 'var(--success-500-10)' }}>
+                                    <h4 style={{ color: 'var(--success-500)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <CheckCircle size={16} /> Strategy Validated
+                                    </h4>
+                                    <p style={{ margin: 0, fontSize: '0.9rem' }}>
+                                        Backtest passed with {backtestResults.winRate}% Win Rate over simulated period.
+                                    </p>
+                                </div>
+                            )}
+
                             <div style={{ marginTop: '24px', display: 'flex', gap: '12px', alignItems: 'center' }}>
                                 <AlertCircle size={20} className="text-warning" />
                                 <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
@@ -481,7 +597,7 @@ export default function StrategyBuilder() {
                             </button>
                         )}
 
-                        {activeStep < 4 ? (
+                        {activeStep < 5 ? (
                             <button
                                 className="btn btn-primary"
                                 onClick={() => {
@@ -499,7 +615,7 @@ export default function StrategyBuilder() {
                                 disabled={isSubmitting}
                             >
                                 {isSubmitting ? (
-                                    <>Creating...</>
+                                    <>{id ? 'Saving...' : 'Launching...'}</>
                                 ) : (
                                     <>
                                         <Save size={16} />

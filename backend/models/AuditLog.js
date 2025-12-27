@@ -19,7 +19,8 @@ const auditLogSchema = new mongoose.Schema({
             'user_created', 'user_blocked', 'user_unblocked',
             'kill_switch_activated', 'kill_switch_deactivated',
             'ip_added', 'ip_removed', 'ip_verified',
-            'system_alert', 'compliance_check'
+            'system_alert', 'compliance_check',
+            'settings_update', 'account_paused', 'security_update'
         ],
         required: true
     },
