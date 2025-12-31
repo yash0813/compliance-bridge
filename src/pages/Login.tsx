@@ -6,6 +6,7 @@ import {
     CheckCircle, Zap, Shield, Activity, Lock as LockIcon,
     Sparkles, FileSearch
 } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { authAPI, checkAPIHealth } from '../services/api'
 import './Login.css'
 
@@ -109,25 +110,61 @@ export default function Login() {
             <div className="login-bg">
                 <div className="bg-gradient" />
                 <div className="bg-grid" />
-                <div className="bg-glow bg-glow-1" />
-                <div className="bg-glow bg-glow-2" />
-                <div className="bg-glow bg-glow-3" />
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 2 }}
+                    className="bg-glow bg-glow-1"
+                />
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 2, delay: 0.5 }}
+                    className="bg-glow bg-glow-2"
+                />
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 2, delay: 1 }}
+                    className="bg-glow bg-glow-3"
+                />
                 <div className="floating-shapes">
-                    <div className="shape shape-1" />
-                    <div className="shape shape-2" />
-                    <div className="shape shape-3" />
-                    <div className="shape shape-4" />
-                    <div className="shape shape-5" />
+                    {[1, 2, 3, 4, 5].map(i => (
+                        <motion.div
+                            key={i}
+                            className={`shape shape-${i}`}
+                            animate={{
+                                y: [0, -20, 0],
+                                rotate: [0, 10, 0],
+                                scale: [1, 1.05, 1]
+                            }}
+                            transition={{
+                                duration: 5 + i,
+                                repeat: Infinity,
+                                ease: "easeInOut"
+                            }}
+                        />
+                    ))}
                 </div>
             </div>
 
             {/* Login Container */}
-            <div className="login-container">
+            <motion.div
+                className="login-container"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+            >
                 {/* Left Panel - Branding */}
                 <div className="login-branding">
                     <div className="branding-content">
                         {/* Logo */}
-                        <div className="logo-section">
+                        <motion.div
+                            className="logo-section"
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.4 }}
+                        >
                             <div className="logo-large">
                                 <ShieldCheck size={32} />
                             </div>
@@ -135,32 +172,44 @@ export default function Login() {
                                 <span className="logo-title-large">Compliance</span>
                                 <span className="logo-subtitle-large">Bridge</span>
                             </div>
-                        </div>
+                        </motion.div>
 
-                        <div className="tagline-section">
+                        <motion.div
+                            className="tagline-section"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.6 }}
+                        >
                             <h1>SEBI-Compliant Algorithmic Trading Infrastructure</h1>
                             <p>The bridge between algo traders and brokers—enabling compliant, secure, and transparent automated trading.</p>
-                        </div>
+                        </motion.div>
 
                         {/* Animated Features */}
                         <div className="features-carousel">
-                            {features.map((feature, index) => {
-                                const Icon = feature.icon
-                                return (
-                                    <div
-                                        key={index}
-                                        className={`feature-slide ${activeFeature === index ? 'active' : ''}`}
-                                    >
-                                        <div className="feature-icon">
-                                            <Icon size={28} />
-                                        </div>
-                                        <div className="feature-content">
-                                            <h3>{feature.title}</h3>
-                                            <p>{feature.description}</p>
-                                        </div>
-                                    </div>
-                                )
-                            })}
+                            <AnimatePresence mode="wait">
+                                {features.map((feature, index) => {
+                                    if (activeFeature !== index) return null
+                                    const Icon = feature.icon
+                                    return (
+                                        <motion.div
+                                            key={index}
+                                            className="feature-slide active"
+                                            initial={{ opacity: 0, x: 20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            exit={{ opacity: 0, x: -20 }}
+                                            transition={{ duration: 0.5 }}
+                                        >
+                                            <div className="feature-icon">
+                                                <Icon size={28} />
+                                            </div>
+                                            <div className="feature-content">
+                                                <h3>{feature.title}</h3>
+                                                <p>{feature.description}</p>
+                                            </div>
+                                        </motion.div>
+                                    )
+                                })}
+                            </AnimatePresence>
                             <div className="carousel-dots">
                                 {features.map((_, index) => (
                                     <button
@@ -173,7 +222,12 @@ export default function Login() {
                         </div>
 
                         {/* Stats */}
-                        <div className="branding-stats">
+                        <motion.div
+                            className="branding-stats"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.8 }}
+                        >
                             <div className="stat-item">
                                 <span className="stat-value">99.9%</span>
                                 <span className="stat-label">Uptime SLA</span>
@@ -188,10 +242,15 @@ export default function Login() {
                                 <span className="stat-value">50+</span>
                                 <span className="stat-label">Brokers</span>
                             </div>
-                        </div>
+                        </motion.div>
 
                         {/* Trust Badges */}
-                        <div className="trust-section">
+                        <motion.div
+                            className="trust-section"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 1 }}
+                        >
                             <span className="trust-label">Trusted by leading brokers</span>
                             <div className="trust-logos">
                                 <div className="trust-logo">Zerodha</div>
@@ -199,29 +258,43 @@ export default function Login() {
                                 <div className="trust-logo">Upstox</div>
                                 <div className="trust-logo">Groww</div>
                             </div>
-                        </div>
+                        </motion.div>
                     </div>
                 </div>
 
                 {/* Right Panel - Login Form */}
-                <div className="login-form-panel">
+                <motion.div
+                    className="login-form-panel"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 }}
+                >
                     <div className="login-form-container">
                         {/* Form Header */}
                         <div className="form-header">
-                            <div className="welcome-badge">
+                            <motion.div
+                                className="welcome-badge"
+                                initial={{ scale: 0.8 }}
+                                animate={{ scale: 1 }}
+                                transition={{ type: 'spring', damping: 12 }}
+                            >
                                 <Sparkles size={14} />
                                 <span>Welcome back</span>
-                            </div>
+                            </motion.div>
                             <h2>Sign in to your account</h2>
                             <p>Enter your credentials to access the platform</p>
                         </div>
 
                         {/* Error Message */}
                         {error && (
-                            <div className="error-message animate-shake">
+                            <motion.div
+                                className="error-message animate-shake"
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                            >
                                 <span className="error-icon">!</span>
                                 {error}
-                            </div>
+                            </motion.div>
                         )}
 
                         {/* Login Form */}
@@ -274,10 +347,12 @@ export default function Login() {
                                 </label>
                             </div>
 
-                            <button
+                            <motion.button
                                 type="submit"
                                 className="btn btn-primary btn-login"
                                 disabled={loading}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                             >
                                 {loading ? (
                                     <>
@@ -290,7 +365,7 @@ export default function Login() {
                                         <ArrowRight size={18} />
                                     </>
                                 )}
-                            </button>
+                            </motion.button>
                         </form>
 
                         {/* Demo Accounts */}
@@ -299,58 +374,32 @@ export default function Login() {
                                 <span>Quick Demo Access</span>
                             </div>
                             <div className="demo-buttons">
-                                <button
-                                    type="button"
-                                    className="demo-btn trader"
-                                    onClick={() => quickLogin('trader@demo.com')}
-                                >
-                                    <div className="demo-btn-icon">
-                                        <Activity size={18} />
-                                    </div>
-                                    <div className="demo-btn-content">
-                                        <span className="demo-btn-title">Trader</span>
-                                        <span className="demo-btn-desc">View trading dashboard</span>
-                                    </div>
-                                </button>
-                                <button
-                                    type="button"
-                                    className="demo-btn broker"
-                                    onClick={() => quickLogin('broker@demo.com')}
-                                >
-                                    <div className="demo-btn-icon">
-                                        <Shield size={18} />
-                                    </div>
-                                    <div className="demo-btn-content">
-                                        <span className="demo-btn-title">Broker</span>
-                                        <span className="demo-btn-desc">Control & compliance</span>
-                                    </div>
-                                </button>
-                                <button
-                                    type="button"
-                                    className="demo-btn admin"
-                                    onClick={() => quickLogin('admin@demo.com')}
-                                >
-                                    <div className="demo-btn-icon">
-                                        <Zap size={18} />
-                                    </div>
-                                    <div className="demo-btn-content">
-                                        <span className="demo-btn-title">Admin</span>
-                                        <span className="demo-btn-desc">Full platform access</span>
-                                    </div>
-                                </button>
-                                <button
-                                    type="button"
-                                    className="demo-btn regulator"
-                                    onClick={() => quickLogin('regulator@demo.com')}
-                                >
-                                    <div className="demo-btn-icon">
-                                        <FileSearch size={18} />
-                                    </div>
-                                    <div className="demo-btn-content">
-                                        <span className="demo-btn-title">Regulator</span>
-                                        <span className="demo-btn-desc">Read-only audit view</span>
-                                    </div>
-                                </button>
+                                {[
+                                    { id: 'trader', email: 'trader@demo.com', title: 'Trader', desc: 'View trading dashboard', icon: Activity },
+                                    { id: 'broker', email: 'broker@demo.com', title: 'Broker', desc: 'Control & compliance', icon: Shield },
+                                    { id: 'admin', email: 'admin@demo.com', title: 'Admin', desc: 'Full platform access', icon: Zap },
+                                    { id: 'regulator', email: 'regulator@demo.com', title: 'Regulator', desc: 'Read-only audit view', icon: FileSearch },
+                                ].map((item, i) => (
+                                    <motion.button
+                                        key={item.id}
+                                        type="button"
+                                        className={`demo-btn ${item.id}`}
+                                        onClick={() => quickLogin(item.email)}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 1.2 + (i * 0.1) }}
+                                        whileHover={{ y: -4, backgroundColor: 'var(--surface-hover)' }}
+                                        whileTap={{ scale: 0.95 }}
+                                    >
+                                        <div className="demo-btn-icon">
+                                            <item.icon size={18} />
+                                        </div>
+                                        <div className="demo-btn-content">
+                                            <span className="demo-btn-title">{item.title}</span>
+                                            <span className="demo-btn-desc">{item.desc}</span>
+                                        </div>
+                                    </motion.button>
+                                ))}
                             </div>
                             <p className="demo-hint">
                                 <LockIcon size={12} />
@@ -377,8 +426,8 @@ export default function Login() {
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
+                </motion.div>
+            </motion.div>
         </div>
     )
 }

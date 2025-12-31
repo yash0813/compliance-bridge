@@ -26,6 +26,7 @@ import {
     Shield,
     Plug
 } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import './Sidebar.css'
 
 // Navigation items are defined per role - each role sees different menu options
@@ -107,21 +108,38 @@ export default function Sidebar() {
     const roleStyle = roleColors[currentRole as keyof typeof roleColors]
 
     return (
-        <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
+        <motion.aside
+            className={`sidebar ${collapsed ? 'collapsed' : ''}`}
+            initial={false}
+            animate={{ width: collapsed ? 80 : 280 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+        >
             {/* Background Pattern */}
             <div className="sidebar-bg-pattern" />
 
             {/* Logo */}
             <div className="sidebar-logo">
-                <div className="logo-icon">
+                <motion.div
+                    className="logo-icon"
+                    whileHover={{ scale: 1.05, rotate: 5 }}
+                    whileTap={{ scale: 0.95 }}
+                >
                     <ShieldCheck size={24} />
-                </div>
-                {!collapsed && (
-                    <div className="logo-text">
-                        <span className="logo-title">Compliance</span>
-                        <span className="logo-subtitle">Bridge</span>
-                    </div>
-                )}
+                </motion.div>
+                <AnimatePresence>
+                    {!collapsed && (
+                        <motion.div
+                            className="logo-text"
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -10 }}
+                            transition={{ duration: 0.2 }}
+                        >
+                            <span className="logo-title">Compliance</span>
+                            <span className="logo-subtitle">Bridge</span>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
                 <button
                     className="collapse-btn"
                     onClick={() => setCollapsed(!collapsed)}
@@ -132,18 +150,37 @@ export default function Sidebar() {
             </div>
 
             {/* Role Badge */}
-            {!collapsed && (
-                <div className="role-badge" style={{ background: roleStyle.bg }}>
-                    <RoleIcon size={14} />
-                    <span>{user?.role?.charAt(0).toUpperCase()}{user?.role?.slice(1)} Portal</span>
-                </div>
-            )}
+            <AnimatePresence>
+                {!collapsed && (
+                    <motion.div
+                        className="role-badge"
+                        style={{ background: roleStyle.bg }}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                    >
+                        <RoleIcon size={14} />
+                        <span>{user?.role?.charAt(0).toUpperCase()}{user?.role?.slice(1)} Portal</span>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Navigation */}
             <nav className="sidebar-nav">
                 <div className="nav-section">
-                    {!collapsed && <span className="nav-section-title">Main Menu</span>}
-                    {navItems.map(item => {
+                    <AnimatePresence>
+                        {!collapsed && (
+                            <motion.span
+                                className="nav-section-title"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                            >
+                                Main Menu
+                            </motion.span>
+                        )}
+                    </AnimatePresence>
+                    {navItems.map((item, index) => {
                         const Icon = item.icon
                         const isActive = location.pathname === item.path ||
                             (item.path === '/dashboard' && location.pathname === '/')
@@ -155,11 +192,33 @@ export default function Sidebar() {
                                 className={`nav-item ${isActive ? 'active' : ''}`}
                                 title={collapsed ? item.label : undefined}
                             >
-                                <div className="nav-icon-wrapper">
+                                <motion.div
+                                    className="nav-icon-wrapper"
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.9 }}
+                                >
                                     <Icon size={20} />
-                                </div>
-                                {!collapsed && <span className="nav-label">{item.label}</span>}
-                                {isActive && <div className="nav-indicator" />}
+                                </motion.div>
+                                <AnimatePresence>
+                                    {!collapsed && (
+                                        <motion.span
+                                            className="nav-label"
+                                            initial={{ opacity: 0, x: -10 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            exit={{ opacity: 0, x: -10 }}
+                                            transition={{ delay: index * 0.05 }}
+                                        >
+                                            {item.label}
+                                        </motion.span>
+                                    )}
+                                </AnimatePresence>
+                                {isActive && (
+                                    <motion.div
+                                        className="nav-indicator"
+                                        layoutId="sidebar-indicator"
+                                        transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+                                    />
+                                )}
                             </NavLink>
                         )
                     })}
@@ -169,17 +228,24 @@ export default function Sidebar() {
             {/* Bottom Section */}
             <div className="sidebar-bottom">
                 {/* Pro Badge */}
-                {!collapsed && (
-                    <div className="pro-badge">
-                        <div className="pro-badge-icon">
-                            <Sparkles size={18} />
-                        </div>
-                        <div className="pro-badge-content">
-                            <span className="pro-badge-title">Enterprise Plan</span>
-                            <span className="pro-badge-subtitle">Full access enabled</span>
-                        </div>
-                    </div>
-                )}
+                <AnimatePresence>
+                    {!collapsed && (
+                        <motion.div
+                            className="pro-badge"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 10 }}
+                        >
+                            <div className="pro-badge-icon">
+                                <Sparkles size={18} />
+                            </div>
+                            <div className="pro-badge-content">
+                                <span className="pro-badge-title">Enterprise Plan</span>
+                                <span className="pro-badge-subtitle">Full access enabled</span>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 {/* Help Button */}
                 <NavLink
@@ -196,25 +262,38 @@ export default function Sidebar() {
                 {/* User Section */}
                 <div className="sidebar-footer">
                     <div className="user-info">
-                        <div className="user-avatar" style={{ background: roleStyle.bg }}>
+                        <motion.div
+                            className="user-avatar"
+                            style={{ background: roleStyle.bg }}
+                            whileHover={{ scale: 1.05 }}
+                        >
                             {user?.name?.charAt(0) || 'U'}
-                        </div>
-                        {!collapsed && (
-                            <div className="user-details">
-                                <span className="user-name">{user?.name || 'User'}</span>
-                                <span className="user-email">{user?.email || 'user@example.com'}</span>
-                            </div>
-                        )}
+                        </motion.div>
+                        <AnimatePresence>
+                            {!collapsed && (
+                                <motion.div
+                                    className="user-details"
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -10 }}
+                                >
+                                    <span className="user-name">{user?.name || 'User'}</span>
+                                    <span className="user-email">{user?.email || 'user@example.com'}</span>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
-                    <button
+                    <motion.button
                         className="logout-btn"
                         onClick={handleLogout}
                         title="Logout"
+                        whileHover={{ scale: 1.1, backgroundColor: 'rgba(239, 68, 68, 0.1)' }}
+                        whileTap={{ scale: 0.9 }}
                     >
                         <LogOut size={18} />
-                    </button>
+                    </motion.button>
                 </div>
             </div>
-        </aside>
+        </motion.aside>
     )
 }

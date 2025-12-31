@@ -7,7 +7,9 @@ import {
     Shield, Zap, Clock, X, ExternalLink, Activity
 } from 'lucide-react'
 import './Header.css'
-import { marketAPI } from '../services/api' // Ensure this import exists or is correct
+import { marketAPI, systemAPI, ordersAPI } from '../services/api'
+import { useToast } from '../context/ToastContext'
+import Chart from 'react-apexcharts'
 
 interface Notification {
     id: number
@@ -41,12 +43,26 @@ export default function Header() {
     const [showSearch, setShowSearch] = useState(false)
     const [notifications, setNotifications] = useState(mockNotifications)
     const [searchQuery, setSearchQuery] = useState('')
+    const [suggestions, setSuggestions] = useState<any[]>([])
     const [searchResult, setSearchResult] = useState<any>(null)
+    const [history, setHistory] = useState<any[]>([])
     const [searchError, setSearchError] = useState<string | null>(null)
     const [isSearching, setIsSearching] = useState(false)
     const notifRef = useRef<HTMLDivElement>(null)
     const searchRef = useRef<HTMLDivElement>(null)
     const [tradingMode, setTradingMode] = useState<string>('PAPER')
+    const [isBrokerLoggedIn, setIsBrokerLoggedIn] = useState<boolean>(false)
+    const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false)
+    const [showOrderModal, setShowOrderModal] = useState(false)
+    const [isPlacingOrder, setIsPlacingOrder] = useState(false)
+    const [orderForm, setOrderForm] = useState({
+        symbol: '',
+        side: 'BUY' as 'BUY' | 'SELL',
+        quantity: 1,
+        price: 0,
+        type: 'MARKET' as 'MARKET' | 'LIMIT'
+    })
+    const { showToast } = useToast()
 
     const unreadCount = notifications.filter(n => !n.read).length
 
@@ -54,8 +70,13 @@ export default function Header() {
     useEffect(() => {
         const fetchSystemConfig = async () => {
             try {
-                const { tradingMode } = await import('../services/api').then(m => m.authAPI.me())
+                const { user, tradingMode } = await import('../services/api').then(m => m.authAPI.me())
                 if (tradingMode) setTradingMode(tradingMode)
+
+                if (user.role === 'admin' || user.role === 'broker') {
+                    const status = await systemAPI.getBrokerStatus()
+                    setIsBrokerLoggedIn(status.isLoggedIn)
+                }
             } catch (e) {
                 console.error("Failed to fetch system config")
             }
@@ -154,16 +175,78 @@ export default function Header() {
         setIsSearching(true);
         setSearchError(null);
         setSearchResult(null);
+        setHistory([]);
+        setSuggestions([]);
 
         try {
-            const quote = await marketAPI.getQuote(query.toUpperCase());
+            const [quote, chartHistory] = await Promise.all([
+                marketAPI.getQuote(query.toUpperCase()),
+                marketAPI.getHistory(query.toUpperCase())
+            ]);
             setSearchResult(quote);
+            setHistory(chartHistory);
         } catch (e: any) {
             console.error("Search error:", e);
             setSearchError(e.message || "Symbol not found");
         } finally {
             setIsSearching(false);
         }
+    };
+
+    // Live suggestion effect
+    useEffect(() => {
+        const timer = setTimeout(async () => {
+            if (searchQuery.length >= 1 && !searchResult) {
+                try {
+                    const results = await marketAPI.search(searchQuery);
+                    setSuggestions(results);
+                } catch (e) {
+                    console.error("Suggestion error:", e);
+                }
+            } else if (searchQuery.length === 0) {
+                setSuggestions([]);
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery, searchResult]);
+
+    const handleBrokerLogin = async () => {
+        setIsLoggingIn(true)
+        try {
+            const res = await systemAPI.brokerLogin()
+            if (res.success) {
+                setIsBrokerLoggedIn(true)
+                showToast('Dhan API Connected Successfully', 'success')
+            }
+        } catch (e: any) {
+            showToast(e.message || 'Dhan Connection Failed', 'error')
+        } finally {
+            setIsLoggingIn(false)
+        }
+    }
+
+    const handlePlaceOrder = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setIsPlacingOrder(true)
+        try {
+            await ordersAPI.create({
+                symbol: orderForm.symbol,
+                side: orderForm.side,
+                quantity: orderForm.quantity,
+                price: orderForm.type === 'LIMIT' ? orderForm.price : undefined
+            })
+            setShowOrderModal(false)
+            showToast('Order placed successfully via DhanHQ', 'success')
+        } catch (error: any) {
+            showToast(error.message || 'Order failed', 'error')
+        } finally {
+            setIsPlacingOrder(false)
+        }
+    }
+
+    const handleOpenStockDetail = (symbol: string) => {
+        window.open(`/#/stock/${symbol}`, '_blank', 'width=1200,height=800');
     };
 
     const currentTime = new Date().toLocaleTimeString('en-IN', {
@@ -226,9 +309,12 @@ export default function Header() {
                                 <input
                                     type="text"
                                     className="search-input"
-                                    placeholder="Search for symbols (e.g., RELIANCE, TCS)..."
+                                    placeholder="Search stocks, indices, strategies..."
                                     value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onChange={(e) => {
+                                        setSearchQuery(e.target.value);
+                                        setSearchResult(null); // Clear result if user starts typing again
+                                    }}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && searchQuery) {
                                             handleSearch(searchQuery)
@@ -242,8 +328,40 @@ export default function Header() {
                             </div>
                             <div className="search-modal-body">
                                 {isSearching && (
-                                    <div className="p-4 text-center text-muted">
-                                        <p>Searching...</p>
+                                    <div className="loading-state" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                        <div className="spinner" style={{ margin: '0 auto 10px' }} />
+                                        <p>Fetching market data...</p>
+                                    </div>
+                                )}
+
+                                {suggestions.length > 0 && !searchResult && !isSearching && (
+                                    <div className="search-suggestions">
+                                        <h4 style={{ margin: '0 0 12px', fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Top Matches</h4>
+                                        {suggestions.map((s, idx) => (
+                                            <div
+                                                key={idx}
+                                                className="suggestion-item"
+                                                onClick={() => {
+                                                    // Handle search in current window
+                                                    setSearchQuery(s.symbol);
+                                                    handleSearch(s.symbol);
+                                                    // OR open in new window directly? User said "when i click stock"
+                                                    // To be safe, clicking the name/symbol opens the window,
+                                                    // while the row click just selects it for preview?
+                                                    // No, user said "open new window". Let's do it on click.
+                                                    handleOpenStockDetail(s.symbol);
+                                                }}
+                                            >
+                                                <div className="suggestion-left">
+                                                    <span className="suggestion-symbol">{s.symbol}</span>
+                                                    <span className="suggestion-name">{s.name}</span>
+                                                </div>
+                                                <div className="suggestion-right">
+                                                    <span className="suggestion-exch">{s.exch}</span>
+                                                    <ChevronDown size={14} style={{ transform: 'rotate(-270deg)', opacity: 0.5 }} />
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
 
@@ -254,21 +372,155 @@ export default function Header() {
                                 )}
 
                                 {searchResult && (
-                                    <div className="search-result-card" style={{ padding: '20px', background: 'var(--bg-secondary)', borderRadius: '12px', marginTop: '10px' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                                            <h3 style={{ margin: 0, fontSize: '1.2rem' }}>{searchResult.symbol}</h3>
-                                            <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>{new Date(searchResult.timestamp).toLocaleTimeString()}</span>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-                                            <span style={{ fontSize: '2rem', fontWeight: 'bold' }}>₹{searchResult.lastPrice.toLocaleString('en-IN')}</span>
-                                            <span style={{
-                                                fontSize: '1rem',
-                                                color: searchResult.change >= 0 ? '#4caf50' : '#ff6b6b',
-                                                display: 'flex',
-                                                alignItems: 'center'
-                                            }}>
-                                                {searchResult.change >= 0 ? '+' : ''}{searchResult.change} ({searchResult.changePercent}%)
-                                            </span>
+                                    <div className="search-result-container animate-fadeIn">
+                                        <div
+                                            className="search-result-card premium-card"
+                                            style={{ padding: '24px', background: 'var(--bg-elevated)', borderRadius: '16px', border: '1px solid var(--border-glass)', marginBottom: '20px' }}
+                                        >
+                                            <div className="result-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+                                                <div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <h3
+                                                            style={{ margin: 0, fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-primary)', cursor: 'pointer' }}
+                                                            onClick={() => handleOpenStockDetail(searchResult.symbol)}
+                                                        >
+                                                            {searchResult.symbol}
+                                                        </h3>
+                                                        <button
+                                                            onClick={() => handleOpenStockDetail(searchResult.symbol)}
+                                                            style={{ background: 'none', border: 'none', color: 'var(--primary-500)', cursor: 'pointer' }}
+                                                            title="Open Full Analysis"
+                                                        >
+                                                            <ExternalLink size={16} />
+                                                        </button>
+                                                        <span className="badge badge-neutral" style={{ fontSize: '10px' }}>NSE</span>
+                                                    </div>
+                                                    <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12px' }}>Spot Price • Last updated {new Date(searchResult.timestamp).toLocaleTimeString()}</p>
+                                                </div>
+                                                <div style={{ textAlign: 'right' }}>
+                                                    <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                                                        ₹{searchResult.lastPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                                    </div>
+                                                    <div style={{
+                                                        fontSize: '14px',
+                                                        fontWeight: '600',
+                                                        color: searchResult.changePercent >= 0 ? 'var(--success-500)' : 'var(--error-500)',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'flex-end',
+                                                        gap: '4px'
+                                                    }}>
+                                                        {searchResult.changePercent >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                                                        {searchResult.change.toFixed(2)} ({searchResult.changePercent.toFixed(2)}%)
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Candlestick Chart */}
+                                            <div className="market-chart-container" style={{ margin: '0 -10px 20px -10px', height: '240px' }}>
+                                                {history.length > 0 ? (
+                                                    <Chart
+                                                        options={{
+                                                            chart: {
+                                                                type: 'candlestick',
+                                                                toolbar: { show: false },
+                                                                background: 'transparent',
+                                                                sparkline: { enabled: false }
+                                                            },
+                                                            theme: { mode: theme as any },
+                                                            xaxis: {
+                                                                type: 'datetime',
+                                                                labels: { show: false, style: { colors: 'var(--text-muted)' } },
+                                                                axisBorder: { show: false },
+                                                                axisTicks: { show: false }
+                                                            },
+                                                            yaxis: {
+                                                                show: true,
+                                                                opposite: true,
+                                                                labels: { style: { colors: 'var(--text-muted)', fontSize: '10px' } }
+                                                            },
+                                                            grid: { borderColor: 'var(--border-primary)', strokeDashArray: 4, padding: { left: 0, right: 0 } },
+                                                            plotOptions: {
+                                                                candlestick: {
+                                                                    colors: { upward: '#10B981', downward: '#EF4444' }
+                                                                }
+                                                            },
+                                                            tooltip: { theme: theme as any }
+                                                        }}
+                                                        series={[{ data: history }]}
+                                                        type="candlestick"
+                                                        height="100%"
+                                                    />
+                                                ) : (
+                                                    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+                                                        {isSearching ? 'Loading chart...' : 'Chart data unavailable'}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Competitor Features: L2/Stats */}
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px', padding: '15px', background: 'var(--surface-secondary)', borderRadius: '12px' }}>
+                                                <div>
+                                                    <p style={{ margin: '0 0 8px', fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Day Range</p>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: '600' }}>
+                                                        <span>L: ₹{(searchResult.lastPrice * 0.98).toFixed(2)}</span>
+                                                        <span>H: ₹{(searchResult.lastPrice * 1.02).toFixed(2)}</span>
+                                                    </div>
+                                                    <div style={{ height: '4px', background: 'var(--border-primary)', borderRadius: '2px', marginTop: '6px', position: 'relative' }}>
+                                                        <div style={{ position: 'absolute', left: '45%', width: '10%', height: '100%', background: 'var(--primary-500)', borderRadius: '2px' }} />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <p style={{ margin: '0 0 8px', fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Market Depth (L1)</p>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                                                        <span style={{ color: 'var(--success-500)' }}>Bid: 42.5k</span>
+                                                        <span style={{ color: 'var(--error-500)' }}>Ask: 38.1k</span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', height: '4px', borderRadius: '2px', marginTop: '6px', overflow: 'hidden' }}>
+                                                        <div style={{ width: '55%', background: 'var(--success-500)' }} />
+                                                        <div style={{ width: '45%', background: 'var(--error-500)' }} />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div style={{ display: 'flex', gap: '12px' }}>
+                                                <button
+                                                    className="btn btn-success"
+                                                    style={{ flex: 1, padding: '14px', borderRadius: '12px', fontWeight: '700', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setOrderForm({
+                                                            ...orderForm,
+                                                            symbol: searchResult.symbol,
+                                                            side: 'BUY',
+                                                            price: searchResult.lastPrice
+                                                        });
+                                                        setShowOrderModal(true);
+                                                        setShowSearch(false);
+                                                    }}
+                                                >
+                                                    <Zap size={18} />
+                                                    BUY {searchResult.symbol}
+                                                </button>
+                                                <button
+                                                    className="btn btn-danger"
+                                                    style={{ flex: 1, padding: '14px', borderRadius: '12px', fontWeight: '700', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setOrderForm({
+                                                            ...orderForm,
+                                                            symbol: searchResult.symbol,
+                                                            side: 'SELL',
+                                                            price: searchResult.lastPrice
+                                                        });
+                                                        setShowOrderModal(true);
+                                                        setShowSearch(false);
+                                                    }}
+                                                >
+                                                    <Zap size={18} />
+                                                    SELL {searchResult.symbol}
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -316,6 +568,20 @@ export default function Header() {
                         <span className={`status-dot active ${tradingMode === 'LIVE' ? 'pulse' : ''}`} />
                         <span>{tradingMode === 'LIVE' ? 'LIVE MARKET' : 'PAPER TRADING'}</span>
                     </div>
+
+                    {/* Broker Connection Status (Only for Broker/Admin) */}
+                    {(user?.role === 'admin' || user?.role === 'broker') && (
+                        <button
+                            className={`broker-status-btn ${isBrokerLoggedIn ? 'connected' : 'disconnected'}`}
+                            onClick={!isBrokerLoggedIn ? handleBrokerLogin : undefined}
+                            disabled={isLoggingIn || isBrokerLoggedIn}
+                        >
+                            <Shield size={14} />
+                            <span>
+                                {isLoggingIn ? 'Connecting...' : isBrokerLoggedIn ? 'Dhan Connected' : 'Connect Dhan'}
+                            </span>
+                        </button>
+                    )}
 
                     {/* Theme Toggle */}
                     <button className="header-btn" onClick={toggleTheme} title="Toggle Theme">
@@ -388,6 +654,103 @@ export default function Header() {
                     </div>
                 </div>
             </div>
+
+            {/* Manual Order Modal - Accessible from Search */}
+            {showOrderModal && (
+                <div className="modal-overlay">
+                    <div className="modal order-modal" style={{ maxWidth: '450px' }}>
+                        <div className="modal-header">
+                            <div className="modal-title-group">
+                                <h2>Direct Trade Ticket</h2>
+                                <p>Execute {orderForm.side} order for {orderForm.symbol}</p>
+                            </div>
+                            <button className="modal-close-btn" onClick={() => setShowOrderModal(false)}>
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <form className="order-form" onSubmit={handlePlaceOrder}>
+                            <div className="side-toggle">
+                                <button
+                                    type="button"
+                                    className={`side-btn buy ${orderForm.side === 'BUY' ? 'active' : ''}`}
+                                    onClick={() => setOrderForm(prev => ({ ...prev, side: 'BUY' }))}
+                                >
+                                    BUY
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`side-btn sell ${orderForm.side === 'SELL' ? 'active' : ''}`}
+                                    onClick={() => setOrderForm(prev => ({ ...prev, side: 'SELL' }))}
+                                >
+                                    SELL
+                                </button>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+                                <div className="form-group">
+                                    <label className="form-label">Symbol</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        value={orderForm.symbol}
+                                        onChange={e => setOrderForm(prev => ({ ...prev, symbol: e.target.value.toUpperCase() }))}
+                                        required
+                                        readOnly
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Quantity</label>
+                                    <input
+                                        type="number"
+                                        className="form-input"
+                                        value={orderForm.quantity}
+                                        onChange={e => setOrderForm(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
+                                        required
+                                        min="1"
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Order Type</label>
+                                    <select
+                                        className="form-select"
+                                        value={orderForm.type}
+                                        onChange={e => setOrderForm(prev => ({ ...prev, type: e.target.value as any }))}
+                                    >
+                                        <option value="MARKET">Market</option>
+                                        <option value="LIMIT">Limit</option>
+                                    </select>
+                                </div>
+                                {orderForm.type === 'LIMIT' && (
+                                    <div className="form-group">
+                                        <label className="form-label">Limit Price</label>
+                                        <input
+                                            type="number"
+                                            step="0.05"
+                                            className="form-input"
+                                            value={orderForm.price}
+                                            onChange={e => setOrderForm(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                                            required
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="modal-actions">
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowOrderModal(false)}>Cancel</button>
+                                <button
+                                    type="submit"
+                                    className={`btn ${orderForm.side === 'BUY' ? 'btn-success' : 'btn-danger'}`}
+                                    disabled={isPlacingOrder}
+                                    style={{ flex: 1 }}
+                                >
+                                    {isPlacingOrder ? 'Executing...' : `Confirm ${orderForm.side}`}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </header >
     )
 }

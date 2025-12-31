@@ -37,6 +37,7 @@ import OrderQueue from './pages/OrderQueue'
 import RiskEngine from './pages/RiskEngine'
 import BrokerAdapters from './pages/BrokerAdapters'
 import Policies from './pages/Policies'
+import StockDetail from './pages/StockDetail'
 
 // Theme Context
 interface ThemeContextType {
@@ -150,6 +151,7 @@ function App() {
                                 <Route path="broker-adapters" element={<BrokerAdapters />} />
                                 <Route path="policies" element={<Policies />} />
                             </Route>
+                            <Route path="/stock/:symbol" element={<StockDetail />} />
                         </Routes>
                     </HashRouter>
                 </ToastProvider>

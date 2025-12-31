@@ -1,38 +1,64 @@
-import { useState } from 'react'
-import { Download, Calendar, Search, FileText, CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Download, Calendar, Search, FileText, CheckCircle, XCircle, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react'
+import { auditAPI } from '../services/api'
+import { useToast } from '../context/ToastContext'
 import './AuditLogs.css'
 
-const logsData = [
-    { id: 1, timestamp: '2024-12-23 10:32:15.123', event: 'signal_received', user: 'USR_12345', resource: 'SIG_001', status: 'success', details: 'Signal received from Momentum Alpha strategy' },
-    { id: 2, timestamp: '2024-12-23 10:32:15.156', event: 'compliance_check', user: 'USR_12345', resource: 'SIG_001', status: 'success', details: 'All 12 compliance rules passed' },
-    { id: 3, timestamp: '2024-12-23 10:32:15.189', event: 'order_placed', user: 'USR_12345', resource: 'ORD_001', status: 'success', details: 'Order placed via Zerodha - RELIANCE BUY 100' },
-    { id: 4, timestamp: '2024-12-23 10:32:16.234', event: 'order_filled', user: 'USR_12345', resource: 'ORD_001', status: 'success', details: 'Order filled at ₹2,450.25' },
-    { id: 5, timestamp: '2024-12-23 10:31:45.100', event: 'signal_received', user: 'USR_67890', resource: 'SIG_002', status: 'success', details: 'Signal received from Mean Reversion strategy' },
-    { id: 6, timestamp: '2024-12-23 10:31:45.145', event: 'compliance_check', user: 'USR_67890', resource: 'SIG_002', status: 'failure', details: 'Failed: MAX_ORD_VAL - Order value exceeds limit' },
-    { id: 7, timestamp: '2024-12-23 10:30:22.050', event: 'user_login', user: 'USR_11111', resource: 'SESSION_001', status: 'success', details: 'User logged in from IP 203.0.113.45' },
-    { id: 8, timestamp: '2024-12-23 10:28:10.200', event: 'rule_updated', user: 'ADMIN_001', resource: 'RULE_005', status: 'success', details: 'Compliance rule MAX_ORD_VAL updated - limit changed to ₹10L' },
-]
-
 export default function AuditLogs() {
-    const [logs] = useState(logsData)
+    const { showToast } = useToast()
+    const [logs, setLogs] = useState<any[]>([])
     const [eventFilter, setEventFilter] = useState('all')
     const [searchTerm, setSearchTerm] = useState('')
+    const [isLoading, setIsLoading] = useState(true)
+    const [isRefreshing, setIsRefreshing] = useState(false)
 
-    const eventTypes = ['all', 'signal_received', 'compliance_check', 'order_placed', 'order_filled', 'user_login', 'rule_updated']
+    const eventTypes = [
+        'all', 'login', 'logout', 'order_placed', 'order_executed', 'order_rejected',
+        'strategy_created', 'user_blocked', 'kill_switch_activated', 'compliance_check'
+    ]
+
+    const fetchLogs = async (quiet = false) => {
+        if (!quiet) setIsLoading(true)
+        else setIsRefreshing(true)
+        try {
+            const res = await auditAPI.getAll()
+            setLogs(res.logs)
+        } catch (error) {
+            showToast('Failed to load audit logs', 'error')
+        } finally {
+            setIsLoading(false)
+            setIsRefreshing(false)
+        }
+    }
+
+    useEffect(() => {
+        fetchLogs()
+    }, [])
 
     const filteredLogs = logs.filter(log => {
-        const matchesEvent = eventFilter === 'all' || log.event === eventFilter
-        const matchesSearch = log.details.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            log.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            log.resource.toLowerCase().includes(searchTerm.toLowerCase())
+        const matchesEvent = eventFilter === 'all' || log.eventType === eventFilter
+        const matchesSearch = log.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (log.userName && log.userName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (log.targetType && log.targetType.toLowerCase().includes(searchTerm.toLowerCase()))
         return matchesEvent && matchesSearch
     })
 
-    const getStatusIcon = (status: string) => {
-        switch (status) {
-            case 'success': return <CheckCircle size={16} className="status-icon success" />
-            case 'failure': return <XCircle size={16} className="status-icon failure" />
-            default: return <AlertTriangle size={16} className="status-icon warning" />
+    const handleExport = () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(logs, null, 2))
+        const downloadAnchorNode = document.createElement('a')
+        downloadAnchorNode.setAttribute("href", dataStr)
+        downloadAnchorNode.setAttribute("download", `audit_logs_${new Date().toISOString()}.json`)
+        document.body.appendChild(downloadAnchorNode)
+        downloadAnchorNode.click()
+        downloadAnchorNode.remove()
+    }
+
+    const getStatusIcon = (severity: string) => {
+        switch (severity) {
+            case 'info': return <CheckCircle size={16} className="status-icon success" />
+            case 'critical': return <XCircle size={16} className="status-icon failure" />
+            case 'warning': return <AlertTriangle size={16} className="status-icon warning" />
+            default: return <CheckCircle size={16} className="status-icon info" />
         }
     }
 
@@ -44,11 +70,11 @@ export default function AuditLogs() {
                     <p>Immutable audit trail for regulatory compliance</p>
                 </div>
                 <div className="header-actions">
-                    <button className="btn btn-secondary">
-                        <Calendar size={16} />
-                        Date Range
+                    <button className="btn btn-secondary" onClick={() => fetchLogs()} disabled={isRefreshing}>
+                        <RefreshCw size={16} className={isRefreshing ? 'spin' : ''} />
+                        Refresh
                     </button>
-                    <button className="btn btn-primary">
+                    <button className="btn btn-primary" onClick={handleExport}>
                         <Download size={16} />
                         Export
                     </button>
@@ -83,32 +109,48 @@ export default function AuditLogs() {
 
             {/* Logs */}
             <div className="logs-container">
-                {filteredLogs.map(log => (
-                    <div key={log.id} className={`log-entry ${log.status}`}>
-                        <div className="log-timeline">
-                            <div className="timeline-dot" />
-                            <div className="timeline-line" />
-                        </div>
-                        <div className="log-content">
-                            <div className="log-header">
-                                <span className="log-timestamp">{log.timestamp}</span>
-                                <span className={`event-badge ${log.event.split('_')[0]}`}>
-                                    {log.event.replace(/_/g, ' ')}
-                                </span>
-                                {getStatusIcon(log.status)}
-                            </div>
-                            <p className="log-details">{log.details}</p>
-                            <div className="log-meta">
-                                <span className="meta-item">
-                                    <span className="meta-label">User:</span> {log.user}
-                                </span>
-                                <span className="meta-item">
-                                    <span className="meta-label">Resource:</span> {log.resource}
-                                </span>
-                            </div>
-                        </div>
+                {isLoading ? (
+                    <div className="loading-state">
+                        <Loader2 size={32} className="spin" />
+                        <p>Fetching regulatory logs...</p>
                     </div>
-                ))}
+                ) : filteredLogs.length === 0 ? (
+                    <div className="empty-state">
+                        <p>No audit events found.</p>
+                    </div>
+                ) : (
+                    filteredLogs.map(log => (
+                        <div key={log._id} className={`log-entry ${log.severity}`}>
+                            <div className="log-timeline">
+                                <div className="timeline-dot" />
+                                <div className="timeline-line" />
+                            </div>
+                            <div className="log-content">
+                                <div className="log-header">
+                                    <span className="log-timestamp">{new Date(log.timestamp).toLocaleString()}</span>
+                                    <span className={`event-badge ${log.eventType.split('_')[0]}`}>
+                                        {log.eventType.replace(/_/g, ' ')}
+                                    </span>
+                                    {getStatusIcon(log.severity)}
+                                </div>
+                                <p className="log-details">{log.description}</p>
+                                <div className="log-meta">
+                                    <span className="meta-item">
+                                        <span className="meta-label">User:</span> {log.userName}
+                                    </span>
+                                    {log.targetType && (
+                                        <span className="meta-item">
+                                            <span className="meta-label">{log.targetType.charAt(0).toUpperCase() + log.targetType.slice(1)}:</span> {log.targetName || log.targetId}
+                                        </span>
+                                    )}
+                                    <span className="meta-item hash">
+                                        <span className="meta-label">Hash:</span> {log.hash}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
 
             {/* Export Info */}

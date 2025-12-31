@@ -108,7 +108,15 @@
     padding: var(--space-5);
     position: relative;
     overflow: hidden;
-    transition: all var(--transition-base);
+    transition: all var(--transition-smooth);
+    display: flex;
+    flex-direction: column;
+}
+
+[data-theme="dark"] .metric-card-v2 {
+    background: linear-gradient(135deg, rgba(28, 28, 32, 0.4) 0%, rgba(15, 15, 18, 0.4) 100%);
+    backdrop-filter: blur(var(--blur-md));
+    border-color: rgba(255, 255, 255, 0.05);
 }
 
 .metric-card-v2::before {
@@ -124,23 +132,23 @@
 }
 
 .metric-card-v2:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
-    border-color: var(--border-secondary);
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: var(--shadow-xl), var(--shadow-glow-primary);
+    border-color: var(--primary-400);
 }
 
 .metric-card-v2:hover::before {
     opacity: 1;
 }
 
-.metric-card-v2.success::before {
-    background: var(--gradient-success);
-    opacity: 1;
+.metric-card-v2.success:hover {
+    box-shadow: var(--shadow-xl), var(--shadow-glow-success);
+    border-color: var(--success-400);
 }
 
-.metric-card-v2.danger::before {
-    background: var(--gradient-danger);
-    opacity: 1;
+.metric-card-v2.danger:hover {
+    box-shadow: var(--shadow-xl), var(--shadow-glow-error);
+    border-color: var(--error-400);
 }
 
 .metric-card-header {
@@ -424,13 +432,29 @@
     border-radius: var(--radius-2xl);
     border: 1px solid var(--border-primary);
     padding: var(--space-5);
-    transition: all var(--transition-base);
+    transition: all var(--transition-smooth);
+    position: relative;
+    overflow: hidden;
+}
+
+[data-theme="dark"] .strategy-card {
+    background: linear-gradient(135deg, rgba(28, 28, 32, 0.4) 0%, rgba(15, 15, 18, 0.4) 100%);
+    backdrop-filter: blur(var(--blur-md));
+    border-color: rgba(255, 255, 255, 0.05);
+}
+
+.strategy-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at top right, rgba(99, 102, 241, 0.05), transparent 70%);
+    pointer-events: none;
 }
 
 .strategy-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
-    border-color: var(--border-secondary);
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-xl);
+    border-color: var(--primary-300);
 }
 
 .strategy-header {

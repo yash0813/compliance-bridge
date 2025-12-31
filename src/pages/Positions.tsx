@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { TrendingUp, TrendingDown, RefreshCw, X, Loader2, AlertCircle } from 'lucide-react'
-import { positionsAPI } from '../services/api'
+import { positionsAPI, ordersAPI } from '../services/api'
 import { useToast } from '../context/ToastContext'
 import './Positions.css'
 
@@ -22,6 +22,15 @@ export default function Positions() {
     const [summary, setSummary] = useState<any>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [isSyncing, setIsSyncing] = useState(false)
+    const [showOrderModal, setShowOrderModal] = useState(false)
+    const [isPlacingOrder, setIsPlacingOrder] = useState(false)
+    const [orderForm, setOrderForm] = useState({
+        symbol: 'RELIANCE',
+        side: 'BUY',
+        quantity: 1,
+        price: 0,
+        type: 'MARKET'
+    })
 
     const fetchData = async () => {
         setIsLoading(true)
@@ -37,6 +46,26 @@ export default function Positions() {
             showToast('Failed to load positions', 'error')
         } finally {
             setIsLoading(false)
+        }
+    }
+
+    const handlePlaceOrder = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setIsPlacingOrder(true)
+        try {
+            await ordersAPI.create({
+                symbol: orderForm.symbol,
+                side: orderForm.side,
+                quantity: orderForm.quantity,
+                price: orderForm.type === 'LIMIT' ? orderForm.price : undefined
+            })
+            setShowOrderModal(false)
+            fetchData()
+            showToast('Order placed successfully', 'success')
+        } catch (error: any) {
+            showToast(error.message || 'Order failed', 'error')
+        } finally {
+            setIsPlacingOrder(false)
         }
     }
 
@@ -95,6 +124,10 @@ export default function Positions() {
                     >
                         <RefreshCw size={16} className={isSyncing ? 'spin' : ''} />
                         {isSyncing ? 'Syncing...' : 'Sync'}
+                    </button>
+                    <button className="btn btn-primary" onClick={() => setShowOrderModal(true)}>
+                        <TrendingUp size={16} />
+                        New Order
                     </button>
                 </div>
             </div>
@@ -183,12 +216,32 @@ export default function Positions() {
                                         <td>
                                             <span className="product-badge">{pos.strategyId?.name || 'Manual'}</span>
                                         </td>
-                                        <td>
+                                        <td style={{ display: 'flex', gap: '8px' }}>
+                                            <button
+                                                className="btn btn-success"
+                                                style={{ padding: '4px 8px', fontSize: '10px' }}
+                                                onClick={() => {
+                                                    setOrderForm({ ...orderForm, symbol: pos.symbol, side: 'BUY' });
+                                                    setShowOrderModal(true);
+                                                }}
+                                            >
+                                                BUY
+                                            </button>
+                                            <button
+                                                className="btn btn-danger"
+                                                style={{ padding: '4px 8px', fontSize: '10px' }}
+                                                onClick={() => {
+                                                    setOrderForm({ ...orderForm, symbol: pos.symbol, side: 'SELL' });
+                                                    setShowOrderModal(true);
+                                                }}
+                                            >
+                                                SELL
+                                            </button>
                                             <button
                                                 className="btn btn-sm btn-outline-danger"
                                                 onClick={() => handleClose(pos._id, pos.symbol)}
                                             >
-                                                Square Off
+                                                Exit
                                             </button>
                                         </td>
                                     </tr>
@@ -198,6 +251,102 @@ export default function Positions() {
                     </div>
                 )}
             </div>
+
+            {/* Manual Order Modal */}
+            {showOrderModal && (
+                <div className="modal-overlay">
+                    <div className="modal order-modal" style={{ maxWidth: '450px' }}>
+                        <div className="modal-header">
+                            <div className="modal-title-group">
+                                <h2>Manual Order Ticket</h2>
+                                <p>Execute direct trades through DhanHQ bridge</p>
+                            </div>
+                            <button className="modal-close-btn" onClick={() => setShowOrderModal(false)}>
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <form className="order-form" onSubmit={handlePlaceOrder}>
+                            <div className="side-toggle">
+                                <button
+                                    type="button"
+                                    className={`side-btn buy ${orderForm.side === 'BUY' ? 'active' : ''}`}
+                                    onClick={() => setOrderForm(prev => ({ ...prev, side: 'BUY' }))}
+                                >
+                                    BUY
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`side-btn sell ${orderForm.side === 'SELL' ? 'active' : ''}`}
+                                    onClick={() => setOrderForm(prev => ({ ...prev, side: 'SELL' }))}
+                                >
+                                    SELL
+                                </button>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+                                <div className="form-group">
+                                    <label>Symbol</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        value={orderForm.symbol}
+                                        onChange={e => setOrderForm(prev => ({ ...prev, symbol: e.target.value.toUpperCase() }))}
+                                        placeholder="e.g. RELIANCE"
+                                        required
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Quantity</label>
+                                    <input
+                                        type="number"
+                                        className="form-input"
+                                        value={orderForm.quantity}
+                                        onChange={e => setOrderForm(prev => ({ ...prev, quantity: parseInt(e.target.value) }))}
+                                        required
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Type</label>
+                                    <select
+                                        className="form-select"
+                                        value={orderForm.type}
+                                        onChange={e => setOrderForm(prev => ({ ...prev, type: e.target.value }))}
+                                    >
+                                        <option value="MARKET">Market</option>
+                                        <option value="LIMIT">Limit</option>
+                                    </select>
+                                </div>
+                                {orderForm.type === 'LIMIT' && (
+                                    <div className="form-group">
+                                        <label>Price</label>
+                                        <input
+                                            type="number"
+                                            step="0.05"
+                                            className="form-input"
+                                            value={orderForm.price}
+                                            onChange={e => setOrderForm(prev => ({ ...prev, price: parseFloat(e.target.value) }))}
+                                            required
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="modal-actions">
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowOrderModal(false)}>Cancel</button>
+                                <button
+                                    type="submit"
+                                    className={`btn ${orderForm.side === 'BUY' ? 'btn-success' : 'btn-danger'}`}
+                                    disabled={isPlacingOrder}
+                                    style={{ flex: 1 }}
+                                >
+                                    {isPlacingOrder ? 'Executing...' : `Confirm ${orderForm.side}`}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

@@ -5,9 +5,11 @@ import {
     PieChart, ArrowUpRight, ArrowDownRight,
     MoreHorizontal, RefreshCw, Plus, Zap, Clock,
     Eye, Play, Pause, Settings, ChevronRight, Wallet,
-    Calendar, Download
+    Calendar, Download, X
 } from 'lucide-react'
+import { useToast } from '../context/ToastContext'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
+import { motion, AnimatePresence } from 'framer-motion'
 import './TraderDashboard.css'
 
 // =============================================
@@ -42,11 +44,21 @@ const weeklyPnL = [
 ]
 
 export default function TraderDashboard() {
+    const { showToast } = useToast()
     const [timeRange, setTimeRange] = useState('today')
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [positions, setPositions] = useState<any[]>([])
     const [orders, setOrders] = useState<any[]>([])
     const [strategies, setStrategies] = useState<any[]>([])
+    const [showOrderModal, setShowOrderModal] = useState(false)
+    const [isPlacingOrder, setIsPlacingOrder] = useState(false)
+    const [orderForm, setOrderForm] = useState({
+        symbol: 'RELIANCE',
+        side: 'BUY',
+        quantity: 10,
+        price: 2450,
+        type: 'LIMIT'
+    })
     const [stats] = useState({
         sharpeRatio: '1.85',
         maxDrawdown: '-4.2%',
@@ -125,30 +137,79 @@ export default function TraderDashboard() {
         fetchDashboardData()
     }
 
+    const handlePlaceOrder = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setIsPlacingOrder(true)
+        try {
+            const res = await ordersAPI.create({
+                symbol: orderForm.symbol,
+                side: orderForm.side,
+                quantity: orderForm.quantity,
+                price: orderForm.type === 'LIMIT' ? orderForm.price : undefined
+            })
+            showToast(`Order executed successfully: ${res.order.orderId}`, 'success')
+            setShowOrderModal(false)
+            fetchDashboardData() // Refresh dashboard
+        } catch (error: any) {
+            showToast(error.message || 'Failed to place order', 'error')
+        } finally {
+            setIsPlacingOrder(false)
+        }
+    }
+
     const quickStats = [
         { label: 'Sharpe Ratio', value: stats.sharpeRatio, change: '+0.12', positive: true },
         { label: 'Max Drawdown', value: stats.maxDrawdown, change: '-0.5%', positive: true },
         { label: 'Avg Trade', value: stats.avgTrade, change: '+₹42', positive: true },
     ]
 
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        show: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.1
+            }
+        }
+    }
+
+    const itemVariants = {
+        hidden: { opacity: 0, y: 20 },
+        show: { opacity: 1, y: 0, transition: { type: 'spring', damping: 25, stiffness: 300 } }
+    }
+
     return (
-        <div className="trader-dashboard">
-            {/* Page Header */}
-            <div className="page-header">
+        <motion.div
+            className="trader-dashboard"
+            initial="hidden"
+            animate="show"
+            variants={containerVariants}
+        >
+            <motion.div className="page-header" variants={itemVariants}>
                 <div className="page-header-left">
                     <div className="page-title-group">
-                        <h1>Trading Dashboard</h1>
+                        <motion.h1
+                            initial={{ x: -20, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            transition={{ delay: 0.2 }}
+                        >
+                            Trading Dashboard
+                        </motion.h1>
                         <p>Real-time overview of your trading activity</p>
                     </div>
                     <div className="header-quick-stats">
                         {quickStats.map((stat, idx) => (
-                            <div key={idx} className="quick-stat-item">
+                            <motion.div
+                                key={idx}
+                                className="quick-stat-item"
+                                whileHover={{ y: -2 }}
+                            >
                                 <span className="quick-stat-label">{stat.label}</span>
                                 <span className="quick-stat-value">{stat.value}</span>
                                 <span className={`quick-stat-change ${stat.positive ? 'positive' : 'negative'}`}>
                                     {stat.change}
                                 </span>
-                            </div>
+                            </motion.div>
                         ))}
                     </div>
                 </div>
@@ -167,16 +228,25 @@ export default function TraderDashboard() {
                         <RefreshCw size={16} className={isRefreshing ? 'spin' : ''} />
                         Refresh
                     </button>
-                    <button className="btn btn-primary">
-                        <Plus size={16} />
+                    <motion.button
+                        className="btn btn-primary"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setShowOrderModal(true)}
+                    >
+                        <Zap size={16} />
                         New Order
-                    </button>
+                    </motion.button>
                 </div>
-            </div>
+            </motion.div>
 
             {/* Primary Metrics */}
             <div className="metrics-grid-4">
-                <div className={`metric-card-v2 ${totalPnl >= 0 ? 'success' : 'danger'}`}>
+                <motion.div
+                    className={`metric-card-v2 ${totalPnl >= 0 ? 'success' : 'danger'}`}
+                    variants={itemVariants}
+                    whileHover={{ y: -5, boxShadow: 'var(--shadow-xl)' }}
+                >
                     <div className="metric-card-header">
                         <div className={`metric-icon-circle ${totalPnl >= 0 ? 'success' : 'danger'}`}>
                             <DollarSign size={22} />
@@ -188,9 +258,16 @@ export default function TraderDashboard() {
                     </div>
                     <div className="metric-card-body">
                         <span className="metric-title">Day P&L</span>
-                        <span className={`metric-amount ${totalPnl >= 0 ? 'positive' : 'negative'}`}>
-                            {totalPnl >= 0 ? '+' : ''}₹{Math.abs(totalPnl).toLocaleString()}
-                        </span>
+                        <AnimatePresence mode="wait">
+                            <motion.span
+                                key={totalPnl}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className={`metric-amount ${totalPnl >= 0 ? 'positive' : 'negative'}`}
+                            >
+                                {totalPnl >= 0 ? '+' : ''}₹{Math.abs(totalPnl).toLocaleString()}
+                            </motion.span>
+                        </AnimatePresence>
                     </div>
                     <div className="metric-card-chart">
                         <ResponsiveContainer width="100%" height={50}>
@@ -211,9 +288,13 @@ export default function TraderDashboard() {
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
-                </div>
+                </motion.div>
 
-                <div className="metric-card-v2">
+                <motion.div
+                    className="metric-card-v2"
+                    variants={itemVariants}
+                    whileHover={{ y: -5, boxShadow: 'var(--shadow-xl)' }}
+                >
                     <div className="metric-card-header">
                         <div className="metric-icon-circle primary">
                             <Target size={22} />
@@ -231,9 +312,13 @@ export default function TraderDashboard() {
                         <span className="metric-sub-label">Since inception</span>
                         <span className="metric-sub-value">32 days</span>
                     </div>
-                </div>
+                </motion.div>
 
-                <div className="metric-card-v2">
+                <motion.div
+                    className="metric-card-v2"
+                    variants={itemVariants}
+                    whileHover={{ y: -5, boxShadow: 'var(--shadow-xl)' }}
+                >
                     <div className="metric-card-header">
                         <div className="metric-icon-circle warning">
                             <PieChart size={22} />
@@ -248,14 +333,23 @@ export default function TraderDashboard() {
                     </div>
                     <div className="metric-card-footer">
                         <div className="win-rate-bar">
-                            <div className="win-bar" style={{ width: `${winRate}%` }} />
+                            <motion.div
+                                className="win-bar"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${winRate}%` }}
+                                transition={{ duration: 1, ease: "easeOut" }}
+                            />
                             <div className="lose-bar" style={{ width: `${100 - winRate}%` }} />
                         </div>
                         <span className="metric-sub-label">45 wins / 22 losses</span>
                     </div>
-                </div>
+                </motion.div>
 
-                <div className="metric-card-v2">
+                <motion.div
+                    className="metric-card-v2"
+                    variants={itemVariants}
+                    whileHover={{ y: -5, boxShadow: 'var(--shadow-xl)' }}
+                >
                     <div className="metric-card-header">
                         <div className="metric-icon-circle info">
                             <Wallet size={22} />
@@ -270,11 +364,16 @@ export default function TraderDashboard() {
                     </div>
                     <div className="metric-card-footer">
                         <div className="exposure-bar">
-                            <div className="exposure-fill" style={{ width: '24.5%' }} />
+                            <motion.div
+                                className="exposure-fill"
+                                initial={{ width: 0 }}
+                                animate={{ width: '24.5%' }}
+                                transition={{ duration: 1, delay: 0.5 }}
+                            />
                         </div>
                         <span className="metric-sub-label">24.5% of capital utilized</span>
                     </div>
-                </div>
+                </motion.div>
             </div>
 
             {/* Charts Row */}
@@ -548,7 +647,27 @@ export default function TraderDashboard() {
                                                 </span>
                                             </div>
                                         </td>
-                                        <td>
+                                        <td style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                            <button
+                                                className="btn btn-success"
+                                                style={{ padding: '4px 8px', fontSize: '10px', height: 'auto' }}
+                                                onClick={() => {
+                                                    setOrderForm({ ...orderForm, symbol: pos.symbol, side: 'BUY' });
+                                                    setShowOrderModal(true);
+                                                }}
+                                            >
+                                                BUY
+                                            </button>
+                                            <button
+                                                className="btn btn-danger"
+                                                style={{ padding: '4px 8px', fontSize: '10px', height: 'auto' }}
+                                                onClick={() => {
+                                                    setOrderForm({ ...orderForm, symbol: pos.symbol, side: 'SELL' });
+                                                    setShowOrderModal(true);
+                                                }}
+                                            >
+                                                SELL
+                                            </button>
                                             <button className="btn btn-ghost btn-icon btn-sm">
                                                 <Eye size={14} />
                                             </button>
@@ -599,6 +718,120 @@ export default function TraderDashboard() {
                     </div>
                 </div>
             </div>
-        </div>
+            {/* New Order Modal */}
+            <AnimatePresence>
+                {showOrderModal && (
+                    <div className="modal-overlay">
+                        <motion.div
+                            className="modal order-modal"
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                        >
+                            <div className="modal-header">
+                                <div className="modal-title-group">
+                                    <h2 className="modal-title">Place Fresh Order</h2>
+                                    <p className="modal-subtitle">Direct execution with risk pre-validation</p>
+                                </div>
+                                <button className="modal-close-btn" onClick={() => setShowOrderModal(false)}>
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            <form className="order-form" onSubmit={handlePlaceOrder}>
+                                <div className="side-toggle">
+                                    <button
+                                        type="button"
+                                        className={`side-btn buy ${orderForm.side === 'BUY' ? 'active' : ''}`}
+                                        onClick={() => setOrderForm(prev => ({ ...prev, side: 'BUY' }))}
+                                    >
+                                        BUY
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`side-btn sell ${orderForm.side === 'SELL' ? 'active' : ''}`}
+                                        onClick={() => setOrderForm(prev => ({ ...prev, side: 'SELL' }))}
+                                    >
+                                        SELL
+                                    </button>
+                                </div>
+
+                                <div className="form-grid">
+                                    <div className="form-group">
+                                        <label>Symbol</label>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            value={orderForm.symbol}
+                                            onChange={e => setOrderForm(prev => ({ ...prev, symbol: e.target.value.toUpperCase() }))}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Quantity</label>
+                                        <input
+                                            type="number"
+                                            className="form-input"
+                                            value={orderForm.quantity}
+                                            onChange={e => setOrderForm(prev => ({ ...prev, quantity: parseInt(e.target.value) }))}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Order Type</label>
+                                        <select
+                                            className="form-select"
+                                            value={orderForm.type}
+                                            onChange={e => setOrderForm(prev => ({ ...prev, type: e.target.value }))}
+                                        >
+                                            <option value="MARKET">Market</option>
+                                            <option value="LIMIT">Limit</option>
+                                        </select>
+                                    </div>
+                                    {orderForm.type === 'LIMIT' && (
+                                        <div className="form-group">
+                                            <label>Price</label>
+                                            <input
+                                                type="number"
+                                                step="0.05"
+                                                className="form-input"
+                                                value={orderForm.price}
+                                                onChange={e => setOrderForm(prev => ({ ...prev, price: parseFloat(e.target.value) }))}
+                                                required
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="order-summary">
+                                    <div className="summary-item">
+                                        <span>Required Margin</span>
+                                        <span>₹{((orderForm.price || 2450) * orderForm.quantity * 0.2).toLocaleString()}</span>
+                                    </div>
+                                    <div className="summary-item">
+                                        <span>Approx Charges</span>
+                                        <span>₹24.50</span>
+                                    </div>
+                                </div>
+
+                                <div className="modal-actions">
+                                    <button type="button" className="btn btn-secondary" onClick={() => setShowOrderModal(false)}>
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className={`btn btn-${orderForm.side === 'BUY' ? 'success' : 'danger'}`}
+                                        disabled={isPlacingOrder}
+                                    >
+                                        {isPlacingOrder ? <RefreshCw size={16} className="spin" /> : <Zap size={16} />}
+                                        {orderForm.side === 'BUY' ? 'Confirm BUY' : 'Confirm SELL'}
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+        </motion.div>
     )
 }

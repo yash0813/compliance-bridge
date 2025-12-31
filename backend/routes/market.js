@@ -151,57 +151,71 @@ router.get('/quote/:symbol', async (req, res) => {
     }
 });
 
-// GET /indices - Batch fetch for header indices
-router.get('/indices', async (req, res) => {
+// GET /search/:query - Symbol suggestions
+router.get('/search/:query', async (req, res) => {
     try {
-        const apiKey = process.env.MARKET_DATA_API_KEY;
+        const { query } = req.params;
+        const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${query}&quotesCount=10&newsCount=0&enableFuzzyQuery=false&quotesQueryId=tss_match_query_v2`;
 
-        if (!apiKey) {
-            // Return mock data if no key
-            return res.json([
-                { symbol: 'NIFTY 50', lastPrice: 22000, change: 100, changePercent: 0.45, timestamp: new Date().toISOString() },
-                { symbol: 'SENSEX', lastPrice: 72000, change: 200, changePercent: 0.28, timestamp: new Date().toISOString() },
-                { symbol: 'BANK NIFTY', lastPrice: 47000, change: -50, changePercent: -0.11, timestamp: new Date().toISOString() }
-            ]);
-        }
-
-        // Twelve Data batch request for indices
-        const symbols = 'NIFTY 50,SENSEX';
-        const response = await axios.get(`https://api.twelvedata.com/quote`, {
-            params: {
-                symbol: symbols,
-                apikey: apiKey,
-            }
+        const response = await axios.get(url, {
+            headers: { 'User-Agent': 'Mozilla/5.0' }
         });
 
-        const result = [];
+        const suggestions = response.data.quotes
+            .filter(q => q.quoteType === 'EQUITY' || q.quoteType === 'INDEX')
+            .map(q => ({
+                symbol: q.symbol.replace('.NS', '').replace('.BO', ''),
+                name: q.shortname || q.longname || q.symbol,
+                exch: q.exchange,
+                type: q.quoteType,
+                fullSymbol: q.symbol
+            }));
 
-        const parse = (data, name) => ({
-            symbol: name,
-            lastPrice: parseFloat(data.close) || 0,
-            change: parseFloat(data.change) || 0,
-            changePercent: parseFloat(data.percent_change) || 0,
-            timestamp: new Date().toISOString()
-        });
-
-        if (response.data['NIFTY 50']) result.push(parse(response.data['NIFTY 50'], 'NIFTY 50'));
-        if (response.data.SENSEX) result.push(parse(response.data.SENSEX, 'SENSEX'));
-
-        // Fetch Bank Nifty from Yahoo (Twelve Data free tier may not support it)
-        try {
-            const bankNifty = await fetchYahooQuote('^NSEBANK');
-            bankNifty.symbol = 'BANK NIFTY';
-            result.push(bankNifty);
-        } catch (e) {
-            // Fallback for Bank Nifty
-            result.push({ symbol: 'BANK NIFTY', lastPrice: 47000, change: 0, changePercent: 0, timestamp: new Date().toISOString() });
-        }
-
-        res.json(result);
-
+        res.json(suggestions);
     } catch (error) {
-        console.error('Market Indices Error:', error.message);
-        res.status(502).json({ error: 'Failed to fetch indices' });
+        console.error('Search error:', error.message);
+        res.status(502).json({ error: 'Failed to fetch suggestions' });
+    }
+});
+
+// GET /history/:symbol - Fetch historical data for candlestick charts
+router.get('/history/:symbol', async (req, res) => {
+    try {
+        const { symbol } = req.params;
+        const upperSymbol = symbol.toUpperCase().trim();
+
+        // NSE/BSE logic
+        let querySymbol = upperSymbol;
+        if (!upperSymbol.includes('.')) {
+            querySymbol = `${upperSymbol}.NS`;
+        }
+
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${querySymbol}?interval=15m&range=1d`;
+        const response = await axios.get(url, {
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+
+        const result = response.data.chart.result[0];
+        if (!result) throw new Error('No historical data found');
+
+        const timestamps = result.timestamp;
+        const quotes = result.indicators.quote[0];
+        const { open, high, low, close, volume } = quotes;
+
+        const history = timestamps.map((t, i) => ({
+            x: new Date(t * 1000),
+            y: [
+                parseFloat(open[i]?.toFixed(2)),
+                parseFloat(high[i]?.toFixed(2)),
+                parseFloat(low[i]?.toFixed(2)),
+                parseFloat(close[i]?.toFixed(2))
+            ]
+        })).filter(d => d.y.every(val => val !== null && val !== undefined));
+
+        res.json(history);
+    } catch (error) {
+        console.error('History error:', error.message);
+        res.status(502).json({ error: 'Failed to fetch historical data' });
     }
 });
 

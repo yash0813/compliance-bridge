@@ -151,6 +151,14 @@ export const marketAPI = {
 
     getIndices: async (): Promise<MarketQuote[]> => {
         return apiRequest('/market/indices');
+    },
+
+    search: async (query: string): Promise<any[]> => {
+        return apiRequest(`/market/search/${query}`);
+    },
+
+    getHistory: async (symbol: string): Promise<any[]> => {
+        return apiRequest(`/market/history/${symbol}`);
     }
 };
 
@@ -349,6 +357,20 @@ export const systemAPI = {
             method: 'POST',
             body: JSON.stringify({ active })
         });
+    },
+    brokerLogin: async (): Promise<{ success: boolean; message: string }> => {
+        return apiRequest('/system/broker-login', { method: 'POST' });
+    },
+    getBrokerStatus: async (): Promise<{
+        success: boolean;
+        mode: string;
+        isLoggedIn: boolean;
+        margin?: {
+            available: number;
+            utilized: number;
+        }
+    }> => {
+        return apiRequest('/system/broker-status');
     }
 };
 
