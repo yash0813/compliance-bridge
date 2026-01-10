@@ -243,6 +243,4 @@ For enterprise inquiries and demos, contact us at: **yash.c0813@gmail.com**
 
 ---
 
-**Built with ❤️ for Indian Algo Trading Community**
-
 *SEBI Compliance Deadline: March 31, 2026*
